@@ -1,0 +1,33 @@
+{
+  "files": {
+    "EXPERIMENT_REPORT.md": "6a984abbc664a31905dd7948aabde5a377edb0e15f809314a06251a8d5b5d253",
+    "README.md": "dccc8a6afae9e6f9286054a60327f69cfcc54b66fa8f1a7b3f72a6110ee57848",
+    "experiment_v062.sqlite": "f343742d1eb765d6f1923518ece560042fc15596788d42506a851fd3b6df019a",
+    "preregistered_replication_protocol.json": "b2784341bba5fa9543ec677165cfd2ed7617867637f3a513fcccb20d40b74624",
+    "pyproject.toml": "fb89fa79b9b0bbef6a1cf01401022bad6dbebde9a7db0e67a3cfeed0eada8371",
+    "replications/seed_9001.json": "564e9d9c7400a02a8767de6e1d1d0429cb0fa6be78a1ee2ca496f958638b6da1",
+    "replications/seed_9001.sqlite": "5a5d77e190942b346439a34d9124d8f2694de1c91ac2f7ffe57c41dd4d3e9392",
+    "replications/seed_9002.json": "f7372726f008c4237317c58b4374744c28f7fb1071e05ebd2c77ea8f18eb2f83",
+    "replications/seed_9002.sqlite": "cdacec376db508e87ab8113f10d76328d772dc9cdf5b734bf5d672c506528e29",
+    "replications/seed_9003.json": "351d751abe54886c07e20f446d480a81f31eb178f501976a7bfea9b6576071ae",
+    "replications/seed_9003.sqlite": "bfd898bba0d9e2b48c168c608a602834122d340c08a39808440e82f03f3168d1",
+    "replications/seed_9004.json": "41eac550e3f81230a6e6a5c3e49637576acf75e42c76d81b45425820bf25e93d",
+    "replications/seed_9004.sqlite": "aab5dc251acf3fbab899ce3b15ecbf921458cf185bcf64ba3a10051713ddf4d3",
+    "replications/seed_9005.json": "8e7a56c63e1cb684471fcc7d4ae3cf5e0c39e77bb4fb49781464260f81acbfd8",
+    "replications/seed_9005.sqlite": "cb150afa7fc0880b72a388035ed6a3c9fd3412cff225120bc36bfe743312ef00",
+    "replications/summary.json": "c977d357690bf5962ba714b30b5c693964f68a05af36805625dd218c37ec7fe7",
+    "results_v062.json": "1bc2f3f5d2612f47ca185b6233482511225542e452d79f7788a057572172f081",
+    "schema.sql": "41ee6e1a42c22eab69f8d00916ac5f9e1da39ac417cb24498ec3b30560382dc5",
+    "source_manifest.json": "32329cdc795cd5716d9068d2f8ff6442cbdc0dad92f20cebcb381f45401c0046",
+    "tests/test_usf06.py": "2f6eb9ca40b5583759e30dc96402177746e59efe269af934e2e081009f67183e",
+    "usf06/__init__.py": "ca6a82dd8629a2f3b917f88291e4fed25e190c860baffa00e3576ee4b7248350",
+    "usf06/__main__.py": "d28cf63f61506e6a9643da3c0ff27181a313e8e3ddd4b32cddf4bcfd113b4d9d",
+    "usf06/benchmark.py": "c0fb38d807b44617a49e93c8a4fa5cc14155acb864d2faf5734fe0f25e66f24f",
+    "usf06/core.py": "aaa52c2414d7a29f45fbf5b2374c6600f26a12c0df8481d7b8210468d8fdeeb8",
+    "usf06/ledger.py": "ba737ae33b4ca2f8562b97e844d2792044983a2a47ffd3a439c9df0a75d6f4ad",
+    "usf06/logos.py": "4b23086a140baa039b00104a22718641fe77477db0c8e9511cfc79e07f6c63c9",
+    "usf06/pareto.py": "7bc721b9abbeb76eed1b1fde8c54ebca75aafcc58543bbe348b8d1ccb749b68e",
+    "usf06/search.py": "adf28749661c8ba51ae228baa9e7b35143ea943269b6044257eeaf21c5b9f749"
+  },
+  "release": "0.6.2"
+}

@@ -1,0 +1,16 @@
+{
+  "protocol_version": "USF-V06-TOY-POLY-1",
+  "implementation_version": "0.6.2",
+  "purpose": "Exploratory-independent-seed replication of learned versus cold policy on integer polynomial synthesis",
+  "independent_task_seeds": [9001, 9002, 9003, 9004, 9005],
+  "budget_per_task": 160,
+  "training_task_count": 10,
+  "test_task_count": 6,
+  "comparison": ["adaptive", "cold_adaptive"],
+  "additional_comparators": ["random", "evolution"],
+  "primary_outcome": "paired_difference_in_mean_heldout_exact_fraction_per_test_task",
+  "secondary_outcomes": ["unseen_cubic_exact", "holdout_mae_mean", "verified_count"],
+  "decision_rule": "Do not claim improved capability unless independent seeds show a robust positive paired advantage, with formal status reported separately",
+  "constraints": ["Never train on heldout results", "Keep search budget identical", "Do not modify code or hyperparameters while executing replications"],
+  "caution": "Small synthetic task families; demonstration not an AGI test"
+}

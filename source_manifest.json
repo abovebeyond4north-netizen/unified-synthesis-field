@@ -1,0 +1,38 @@
+{
+  "modules": [
+    {
+      "module": "__init__.py",
+      "sha256": "ca6a82dd8629a2f3b917f88291e4fed25e190c860baffa00e3576ee4b7248350"
+    },
+    {
+      "module": "__main__.py",
+      "sha256": "d28cf63f61506e6a9643da3c0ff27181a313e8e3ddd4b32cddf4bcfd113b4d9d"
+    },
+    {
+      "module": "benchmark.py",
+      "sha256": "c0fb38d807b44617a49e93c8a4fa5cc14155acb864d2faf5734fe0f25e66f24f"
+    },
+    {
+      "module": "core.py",
+      "sha256": "aaa52c2414d7a29f45fbf5b2374c6600f26a12c0df8481d7b8210468d8fdeeb8"
+    },
+    {
+      "module": "ledger.py",
+      "sha256": "ba737ae33b4ca2f8562b97e844d2792044983a2a47ffd3a439c9df0a75d6f4ad"
+    },
+    {
+      "module": "logos.py",
+      "sha256": "4b23086a140baa039b00104a22718641fe77477db0c8e9511cfc79e07f6c63c9"
+    },
+    {
+      "module": "pareto.py",
+      "sha256": "7bc721b9abbeb76eed1b1fde8c54ebca75aafcc58543bbe348b8d1ccb749b68e"
+    },
+    {
+      "module": "search.py",
+      "sha256": "adf28749661c8ba51ae228baa9e7b35143ea943269b6044257eeaf21c5b9f749"
+    }
+  ],
+  "source_bundle_sha256": "4a1991cf397fa64f1a339aa65f0808efdfbfa8e11a99679b7d71a28a1ee14ea9",
+  "replication_protocol_sha256": "b2784341bba5fa9543ec677165cfd2ed7617867637f3a513fcccb20d40b74624"
+}

@@ -1,0 +1,26 @@
+name: Python verification
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Deterministic benchmark smoke and ledger audit
+        run: |
+          python -m usf06 benchmark --db ci.sqlite --report ci.json --seed 1201 --budget 12 --train-tasks 2 --test-tasks 2
+          python -m usf06 ledger-check --db ci.sqlite

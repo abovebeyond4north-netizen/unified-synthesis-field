@@ -1,0 +1,36 @@
+name: Lean kernel smoke and axiom audit
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  formal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          auto-config: false
+          build: false
+          test: false
+          lint: false
+          use-mathlib-cache: true
+      - name: Compile Lean smoke theorem and print axioms
+        run: lake env lean lean/USF.lean | tee lean_axioms.txt
+      - name: Strict axiom allowlist audit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from usf06.logos import parse_axiom_output
+          output = Path('lean_axioms.txt').read_text()
+          allowed = {'propext', 'Classical.choice', 'Quot.sound'}
+          observed = parse_axiom_output(output, 'USF.ring_example')
+          assert observed is not None, f'Missing axiom report: {output}'
+          assert set(observed).issubset(allowed), f'Unapproved axioms: {observed}'
+          assert 'sorryAx' not in output
+          print('Lean axiom audit passed:', observed)
+          PY

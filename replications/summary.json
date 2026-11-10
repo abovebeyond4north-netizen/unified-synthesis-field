@@ -1,0 +1,131 @@
+{
+  "mean_across_seeds_delta": 0.0,
+  "mean_cold_exact": 0.3333,
+  "mean_trained_exact": 0.3333,
+  "negative_seeds": 1,
+  "positive_seeds": 1,
+  "protocol": {
+    "additional_comparators": [
+      "random",
+      "evolution"
+    ],
+    "budget_per_task": 160,
+    "caution": "Small synthetic task families; demonstration not an AGI test",
+    "comparison": [
+      "adaptive",
+      "cold_adaptive"
+    ],
+    "constraints": [
+      "Never train on heldout results",
+      "Keep search budget identical",
+      "Do not modify code or hyperparameters while executing replications"
+    ],
+    "decision_rule": "Do not claim improved capability unless independent seeds show a robust positive paired advantage, with formal status reported separately",
+    "implementation_version": "0.6.2",
+    "independent_task_seeds": [
+      9001,
+      9002,
+      9003,
+      9004,
+      9005
+    ],
+    "primary_outcome": "paired_difference_in_mean_heldout_exact_fraction_per_test_task",
+    "protocol_version": "USF-V06-TOY-POLY-1",
+    "purpose": "Exploratory-independent-seed replication of learned versus cold policy on integer polynomial synthesis",
+    "secondary_outcomes": [
+      "unseen_cubic_exact",
+      "holdout_mae_mean",
+      "verified_count"
+    ],
+    "test_task_count": 6,
+    "training_task_count": 10
+  },
+  "replications": [
+    {
+      "bootstrap_95pct_ci": [
+        0.0,
+        0.0
+      ],
+      "cold_exact": 0.3333,
+      "ledger_integrity": {
+        "events": 5468,
+        "verified": true
+      },
+      "mean_delta": 0.0,
+      "seed": 9001,
+      "trained_exact": 0.3333,
+      "unseen_cubic_cold": 0.0,
+      "unseen_cubic_trained": 0.0,
+      "verified_count": 0
+    },
+    {
+      "bootstrap_95pct_ci": [
+        0.0,
+        0.5
+      ],
+      "cold_exact": 0.1667,
+      "ledger_integrity": {
+        "events": 5468,
+        "verified": true
+      },
+      "mean_delta": 0.1667,
+      "seed": 9002,
+      "trained_exact": 0.3333,
+      "unseen_cubic_cold": 0.0,
+      "unseen_cubic_trained": 0.0,
+      "verified_count": 0
+    },
+    {
+      "bootstrap_95pct_ci": [
+        -0.5,
+        0.0
+      ],
+      "cold_exact": 0.5,
+      "ledger_integrity": {
+        "events": 5468,
+        "verified": true
+      },
+      "mean_delta": -0.1667,
+      "seed": 9003,
+      "trained_exact": 0.3333,
+      "unseen_cubic_cold": 0.3333,
+      "unseen_cubic_trained": 0.0,
+      "verified_count": 0
+    },
+    {
+      "bootstrap_95pct_ci": [
+        0.0,
+        0.0
+      ],
+      "cold_exact": 0.3333,
+      "ledger_integrity": {
+        "events": 5468,
+        "verified": true
+      },
+      "mean_delta": 0.0,
+      "seed": 9004,
+      "trained_exact": 0.3333,
+      "unseen_cubic_cold": 0.0,
+      "unseen_cubic_trained": 0.0,
+      "verified_count": 0
+    },
+    {
+      "bootstrap_95pct_ci": [
+        0.0,
+        0.0
+      ],
+      "cold_exact": 0.3333,
+      "ledger_integrity": {
+        "events": 5468,
+        "verified": true
+      },
+      "mean_delta": 0.0,
+      "seed": 9005,
+      "trained_exact": 0.3333,
+      "unseen_cubic_cold": 0.0,
+      "unseen_cubic_trained": 0.0,
+      "verified_count": 0
+    }
+  ],
+  "ties": 3
+}
