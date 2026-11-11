@@ -16,6 +16,7 @@ from .core import canonical_json, make_tasks, sha256
 from .ledger import Ledger
 from .logos import LogosGate
 from .pareto import FrontierItem, VerifiedParetoArchive
+from .preflight import evaluation_claim_preflight
 from .search import AdaptivePolicy, search
 
 
@@ -130,11 +131,21 @@ def run_benchmark(db_path: str, report_path: str, *, seed: int = 42, budget: int
         paired = [adapted[t.task_id]["holdout_exact"] - baseline[t.task_id]["holdout_exact"] for t in test]
         delta = sum(paired)/len(paired)
         lower, upper = _paired_bootstrap(paired, seed+999)
+        claim_preflight = evaluation_claim_preflight(
+            rows,
+            expected_test_tasks=len(test),
+            configured_budget_per_task=budget,
+            # The in-process v0.6.2 harness cannot establish these properties.
+            concealed_evaluator=False,
+            independent_administration=False,
+            matched_wall_budget_enforced=False,
+        )
         report = {"run_id": run_id, "config": cfg,
                   "train_task_commitment": train_commitment,
                   "sealed_test_commitment": holdout_commitment,
                   "training": training, "frozen_policy": frozen_policy,
                   "methods": methods,
+                  "claim_preflight": claim_preflight,
                   "comparison_trained_vs_cold_adaptive": {
                       "paired_mean_difference": round(delta, 4),
                       "bootstrap_95pct_CI": [lower, upper],
