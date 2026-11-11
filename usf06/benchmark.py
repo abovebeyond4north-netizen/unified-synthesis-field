@@ -139,6 +139,7 @@ def run_benchmark(db_path: str, report_path: str, *, seed: int = 42, budget: int
             concealed_evaluator=False,
             independent_administration=False,
             matched_wall_budget_enforced=False,
+            paired_advantage_ci_lower_bound=lower,
         )
         report = {"run_id": run_id, "config": cfg,
                   "train_task_commitment": train_commitment,
