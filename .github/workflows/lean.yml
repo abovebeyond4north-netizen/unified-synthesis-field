@@ -36,7 +36,20 @@ jobs:
           PY
       - name: Download Mathlib compiled cache
         run: lake exe cache get
+      - name: Verify pipeline failure propagation
+        shell: bash
+        run: |
+          if (
+            printf '%s\n' "'USF.ring_example' depends on axioms: [propext]"
+            exit 7
+          ) | tee pipeline_negative_control.txt; then
+            echo "A failing compiler pipeline was masked by tee" >&2
+            exit 1
+          fi
+          grep -Fx "'USF.ring_example' depends on axioms: [propext]" pipeline_negative_control.txt
+          rm pipeline_negative_control.txt
       - name: Compile static Lean smoke theorem
+        shell: bash
         run: lake env lean lean/USF.lean | tee lean_axioms.txt
       - name: Strict static axiom allowlist audit
         run: |
