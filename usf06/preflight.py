@@ -105,9 +105,9 @@ def evaluation_claim_preflight(
         "positive_no_memory_baseline_successes": len(positive_ids) > 0,
         "all_positive_baseline_successes_retained": not lost_ids,
         "configured_search_budget_per_task": configured_budget_per_task,
-        "matched_wall_budget_enforced": bool(matched_wall_budget_enforced),
-        "concealed_evaluator": bool(concealed_evaluator),
-        "independent_administration": bool(independent_administration),
+        "matched_wall_budget_enforced": matched_wall_budget_enforced is True,
+        "concealed_evaluator": concealed_evaluator is True,
+        "independent_administration": independent_administration is True,
     }
     blocking = [name for name, value in checks.items() if isinstance(value, bool) and not value]
     claim_checks = {

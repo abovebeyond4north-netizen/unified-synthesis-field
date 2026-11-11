@@ -76,6 +76,39 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertTrue(result["claim_accepted"])
         self.assertEqual(result["paired_mean_difference"], 0.5)
 
+
+    def test_configuration_evidence_requires_literal_true(self):
+        # Python bool('false') evaluates True; malformed serialized flags
+        # must never establish evaluator independence, concealment, or budget matching.
+        rows = [
+            row("T1", "random", 0.0), row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
+            row("T2", "random", 1.0), row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
+        ]
+        for malformed in ("false", "true", 1, [], {"verified": True}, None):
+            with self.subTest(malformed=malformed):
+                for flag in (
+                    "matched_wall_budget_enforced",
+                    "concealed_evaluator",
+                    "independent_administration",
+                ):
+                    options = {
+                        "matched_wall_budget_enforced": True,
+                        "concealed_evaluator": True,
+                        "independent_administration": True,
+                    }
+                    options[flag] = malformed
+                    result = evaluation_claim_preflight(
+                        rows,
+                        expected_test_tasks=2,
+                        configured_budget_per_task=160,
+                        paired_advantage_ci_lower_bound=0.1,
+                        **options,
+                    )
+                    self.assertFalse(result["eligible"])
+                    self.assertFalse(result["claim_accepted"])
+                    self.assertIn(flag, result["blocking_reasons"])
+                    self.assertIn("preliminary_eligibility", result["claim_blocking_reasons"])
+
     def test_incomplete_or_unpaired_arms_fail(self):
         result = evaluation_claim_preflight(
             [row("T1", "random", 1.0), row("T1", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0)],
