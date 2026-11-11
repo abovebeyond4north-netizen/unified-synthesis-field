@@ -40,7 +40,12 @@ def evaluation_claim_preflight(
         for arm in REQUIRED_ARMS
     }
     complete_arms = all(counts[arm] == expected_test_tasks for arm in REQUIRED_ARMS)
-    paired_tasks = complete_arms and len({frozenset(tasks_by_arm[arm]) for arm in REQUIRED_ARMS}) == 1
+    unique_task_ids = all(len(tasks_by_arm[arm]) == expected_test_tasks for arm in REQUIRED_ARMS)
+    paired_tasks = (
+        complete_arms
+        and unique_task_ids
+        and len({frozenset(tasks_by_arm[arm]) for arm in REQUIRED_ARMS}) == 1
+    )
 
     baseline = {
         str(row.get("task_id")): row
@@ -64,6 +69,7 @@ def evaluation_claim_preflight(
 
     checks = {
         "complete_required_arms": complete_arms,
+        "unique_task_ids_per_arm": unique_task_ids,
         "task_ids_paired_across_arms": paired_tasks,
         "positive_no_memory_baseline_successes": len(positive_ids) > 0,
         "all_positive_baseline_successes_retained": not lost_ids,
