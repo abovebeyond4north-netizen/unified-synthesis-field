@@ -1,16 +1,21 @@
+import json
+from pathlib import Path
 import unittest
 
-from usf06.preflight import evaluation_claim_preflight
+from usf06.preflight import REQUIRED_ARMS, evaluation_claim_preflight
 
 
 def row(task, mode, exact):
     return {"task_id": task, "mode": mode, "holdout_exact": exact}
 
 
+MODES = ("random", "evolution", "cold_adaptive", "adaptive")
+
+
 class EvaluationClaimPreflightTests(unittest.TestCase):
     def test_zero_positive_baseline_fails_closed(self):
         rows = [row(task, mode, 0.0) for task in ("T1", "T2")
-                for mode in ("random", "cold_adaptive", "adaptive")]
+                for mode in MODES]
         result = evaluation_claim_preflight(
             rows,
             expected_test_tasks=2,
@@ -24,8 +29,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
 
     def test_lost_positive_baseline_is_recorded(self):
         rows = [
-            row("T1", "random", 0.0), row("T1", "cold_adaptive", 1.0), row("T1", "adaptive", 0.0),
-            row("T2", "random", 1.0), row("T2", "cold_adaptive", 0.0), row("T2", "adaptive", 1.0),
+            row("T1", "random", 0.0), row("T1", "evolution", 0.0),
+            row("T1", "cold_adaptive", 1.0), row("T1", "adaptive", 0.0),
+            row("T2", "random", 1.0), row("T2", "evolution", 1.0),
+            row("T2", "cold_adaptive", 0.0), row("T2", "adaptive", 1.0),
         ]
         result = evaluation_claim_preflight(
             rows,
@@ -41,8 +48,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
 
     def test_complete_precommitted_contract_can_pass(self):
         rows = [
-            row("T1", "random", 0.0), row("T1", "cold_adaptive", 1.0), row("T1", "adaptive", 1.0),
-            row("T2", "random", 1.0), row("T2", "cold_adaptive", 0.0), row("T2", "adaptive", 1.0),
+            row("T1", "random", 0.0), row("T1", "evolution", 0.0),
+            row("T1", "cold_adaptive", 1.0), row("T1", "adaptive", 1.0),
+            row("T2", "random", 1.0), row("T2", "evolution", 1.0),
+            row("T2", "cold_adaptive", 0.0), row("T2", "adaptive", 1.0),
         ]
         result = evaluation_claim_preflight(
             rows,
@@ -60,8 +69,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
 
     def test_forged_confidence_bound_cannot_accept_claim(self):
         rows = [
-            row("T1", "random", 0.0), row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
-            row("T2", "random", 1.0), row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
+            row("T1", "random", 0.0), row("T1", "evolution", 0.0),
+            row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
+            row("T2", "random", 1.0), row("T2", "evolution", 1.0),
+            row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
         ]
         result = evaluation_claim_preflight(
             rows,
@@ -86,6 +97,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             baseline = 1.0 if i == 0 else 0.0
             rows.extend((
                 row(task, "random", 0.0),
+                row(task, "evolution", 0.0),
                 row(task, "cold_adaptive", baseline),
                 row(task, "adaptive", 1.0),
             ))
@@ -123,6 +135,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             baseline = 1.0 if i == 0 else 0.0
             rows.extend((
                 row(task, "random", 0.0),
+                row(task, "evolution", 0.0),
                 row(task, "cold_adaptive", baseline),
                 row(task, "adaptive", 1.0),
             ))
@@ -148,8 +161,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         # Python bool('false') evaluates True; malformed serialized flags
         # must never establish evaluator independence, concealment, or budget matching.
         rows = [
-            row("T1", "random", 0.0), row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
-            row("T2", "random", 1.0), row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
+            row("T1", "random", 0.0), row("T1", "evolution", 0.0),
+            row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
+            row("T2", "random", 1.0), row("T2", "evolution", 1.0),
+            row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
         ]
         for malformed in ("false", "true", 1, [], {"verified": True}, None):
             with self.subTest(malformed=malformed):
@@ -189,7 +204,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertIn("task_ids_paired_across_arms", result["blocking_reasons"])
 
     def test_duplicate_task_ids_fail(self):
-        rows = [row("T1", mode, 1.0) for mode in ("random", "cold_adaptive", "adaptive") for _ in range(2)]
+        rows = [row("T1", mode, 1.0) for mode in MODES for _ in range(2)]
         result = evaluation_claim_preflight(
             rows,
             expected_test_tasks=2,
@@ -208,7 +223,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
                 rows = [
                     row(task, mode, 1.0)
                     for task in ("T1", "T2")
-                    for mode in ("random", "cold_adaptive", "adaptive")
+                    for mode in MODES
                 ]
                 rows[-1]["holdout_exact"] = value
                 result = evaluation_claim_preflight(
@@ -222,6 +237,40 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
                 )
                 self.assertFalse(result["eligible"])
                 self.assertIn("valid_correctness_outcomes", result["blocking_reasons"])
+
+    def test_missing_evolutionary_comparator_fails_closed(self):
+        rows = []
+        for i in range(20):
+            task = f"T{i:02d}"
+            baseline = 1.0 if i == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        result = evaluation_claim_preflight(
+            rows,
+            expected_test_tasks=20,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+        )
+        self.assertFalse(result["eligible"])
+        self.assertFalse(result["claim_accepted"])
+        self.assertFalse(result["checks"]["complete_required_arms"])
+        self.assertEqual(result["observed_rows_by_arm"]["evolution"], 0)
+        self.assertIn("evolution", result["required_arms"])
+
+    def test_preregistered_protocol_freezes_all_required_arms(self):
+        protocol_path = Path(__file__).resolve().parents[1] / "preregistered_concealed_evaluation_protocol.json"
+        protocol = json.loads(protocol_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            [arm["name"] for arm in protocol["frozen_arms"]],
+            list(REQUIRED_ARMS),
+        )
+        self.assertIn("missing evolutionary comparator rows", protocol["automatic_blockers"])
 
 
 if __name__ == "__main__":

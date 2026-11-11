@@ -12,7 +12,7 @@ import random
 from typing import Iterable, Mapping
 
 
-REQUIRED_ARMS = ("random", "cold_adaptive", "adaptive")
+REQUIRED_ARMS = ("random", "evolution", "cold_adaptive", "adaptive")
 REQUIRED_BOOTSTRAP_ITERATIONS = 2000
 
 
@@ -53,8 +53,8 @@ def evaluation_claim_preflight(
     """Return a canonical, fail-closed claim-eligibility summary.
 
     ``cold_adaptive`` is the causal no-memory ablation: it uses the same
-    adaptive search implementation with a fresh policy.  Random is retained as
-    a non-learning comparator.  The function deliberately cannot infer
+    adaptive search implementation with a fresh policy.  Random and evolution
+    are retained as distinct non-learning comparators.  The function cannot infer
     concealment, independence, or wall-budget enforcement from result rows.
     Those properties must be supplied by the frozen execution contract.
     """
@@ -195,6 +195,7 @@ def evaluation_claim_preflight(
         "required_arms": list(REQUIRED_ARMS),
         "no_memory_ablation": "cold_adaptive",
         "non_learning_comparator": "random",
+        "evolutionary_comparator": "evolution",
         "expected_test_tasks": expected_test_tasks,
         "observed_rows_by_arm": {arm: counts[arm] for arm in REQUIRED_ARMS},
         "positive_baseline_successes": len(positive_ids),

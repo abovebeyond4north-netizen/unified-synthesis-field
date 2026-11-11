@@ -1,11 +1,16 @@
 {
-  "protocol_version": "USF-MA-CONCEALED-CLAIM-1",
+  "protocol_version": "USF-MA-CONCEALED-CLAIM-2",
+  "supersedes": "USF-MA-CONCEALED-CLAIM-1",
   "status": "preregistered_not_executed",
   "purpose": "Fail-closed Milestone A evaluation contract for concealed target-free rediscovery; passing is necessary but not sufficient for a capability claim.",
   "frozen_arms": [
     {
       "name": "random",
       "role": "non_learning_comparator"
+    },
+    {
+      "name": "evolution",
+      "role": "non_learning_evolutionary_comparator"
     },
     {
       "name": "cold_adaptive",
@@ -64,6 +69,7 @@
   "automatic_blockers": [
     "zero positive no-memory baseline successes",
     "missing or unpaired arm rows",
+    "missing evolutionary comparator rows",
     "lost positive baseline success",
     "unmatched wall or candidate budgets",
     "target material visible to candidate process",
