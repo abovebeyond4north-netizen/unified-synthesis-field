@@ -43,6 +43,7 @@ def evaluation_claim_preflight(
     *,
     expected_test_tasks: int,
     configured_budget_per_task: int,
+    expected_task_order: Iterable[str] | None = None,
     concealed_evaluator: bool = False,
     independent_administration: bool = False,
     matched_wall_budget_enforced: bool = False,
@@ -55,8 +56,9 @@ def evaluation_claim_preflight(
     ``cold_adaptive`` is the causal no-memory ablation: it uses the same
     adaptive search implementation with a fresh policy.  Random and evolution
     are retained as distinct non-learning comparators.  The function cannot infer
-    concealment, independence, or wall-budget enforcement from result rows.
-    Those properties must be supplied by the frozen execution contract.
+    concealment, independence, wall-budget enforcement, or the intended task
+    order from result rows.  Those properties must be supplied by the frozen
+    execution contract.
     """
     if expected_test_tasks < 1 or configured_budget_per_task < 1:
         raise ValueError("expected tasks and configured budget must be positive")
@@ -81,12 +83,32 @@ def evaluation_claim_preflight(
         arm: {str(row.get("task_id")) for row in materialized if row.get("mode") == arm}
         for arm in REQUIRED_ARMS
     }
+    observed_task_order_by_arm = {
+        arm: [str(row.get("task_id")) for row in materialized if row.get("mode") == arm]
+        for arm in REQUIRED_ARMS
+    }
+    task_order_receipt = None
+    if expected_task_order is not None and not isinstance(expected_task_order, str):
+        try:
+            task_order_receipt = list(expected_task_order)
+        except TypeError:
+            pass
+    valid_task_order_receipt = (
+        task_order_receipt is not None
+        and len(task_order_receipt) == expected_test_tasks
+        and all(isinstance(task_id, str) and bool(task_id.strip()) for task_id in task_order_receipt)
+        and len(set(task_order_receipt)) == expected_test_tasks
+    )
     complete_arms = all(counts[arm] == expected_test_tasks for arm in REQUIRED_ARMS)
     unique_task_ids = all(len(tasks_by_arm[arm]) == expected_test_tasks for arm in REQUIRED_ARMS)
     paired_tasks = (
         complete_arms
         and unique_task_ids
         and len({frozenset(tasks_by_arm[arm]) for arm in REQUIRED_ARMS}) == 1
+    )
+    ordered_tasks = (
+        valid_task_order_receipt
+        and all(observed_task_order_by_arm[arm] == task_order_receipt for arm in REQUIRED_ARMS)
     )
 
     baseline = {
@@ -112,7 +134,7 @@ def evaluation_claim_preflight(
 
     paired_differences: list[float] = []
     paired_mean_difference = None
-    if paired_tasks and valid_task_ids and valid_outcomes:
+    if paired_tasks and ordered_tasks and valid_task_ids and valid_outcomes:
         paired_task_ids = [
             str(row["task_id"])
             for row in materialized
@@ -170,6 +192,7 @@ def evaluation_claim_preflight(
         "valid_task_ids": valid_task_ids,
         "unique_task_ids_per_arm": unique_task_ids,
         "task_ids_paired_across_arms": paired_tasks,
+        "task_order_matches_frozen_receipt": ordered_tasks,
         "valid_correctness_outcomes": valid_outcomes,
         "positive_no_memory_baseline_successes": len(positive_ids) > 0,
         "all_positive_baseline_successes_retained": not lost_ids,
@@ -198,6 +221,8 @@ def evaluation_claim_preflight(
         "evolutionary_comparator": "evolution",
         "expected_test_tasks": expected_test_tasks,
         "observed_rows_by_arm": {arm: counts[arm] for arm in REQUIRED_ARMS},
+        "expected_task_order": task_order_receipt,
+        "observed_task_order_by_arm": observed_task_order_by_arm,
         "positive_baseline_successes": len(positive_ids),
         "retained_positive_baseline_successes": len(retained_ids),
         "lost_positive_baseline_task_ids": lost_ids,

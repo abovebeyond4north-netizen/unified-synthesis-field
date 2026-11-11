@@ -69,6 +69,7 @@
   "automatic_blockers": [
     "zero positive no-memory baseline successes",
     "missing or unpaired arm rows",
+    "missing or mismatched per-arm task-order receipt",
     "missing evolutionary comparator rows",
     "lost positive baseline success",
     "unmatched wall or candidate budgets",

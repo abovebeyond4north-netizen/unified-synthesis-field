@@ -126,6 +126,7 @@ def run_benchmark(db_path: str, report_path: str, *, seed: int = 42, budget: int
             rows,
             expected_test_tasks=len(test),
             configured_budget_per_task=budget,
+            expected_task_order=[task.task_id for task in test],
             # The in-process v0.6.2 harness cannot establish these properties.
             concealed_evaluator=False,
             independent_administration=False,
