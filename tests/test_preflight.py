@@ -55,6 +55,26 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertTrue(result["eligible"])
         self.assertEqual(result["blocking_reasons"], [])
         self.assertEqual(result["retained_positive_baseline_successes"], 1)
+        self.assertFalse(result["claim_accepted"])
+        self.assertIn("bootstrap_95pct_lower_bound_exceeds_zero", result["claim_blocking_reasons"])
+
+    def test_complete_claim_requires_positive_effect_and_confidence_bound(self):
+        rows = [
+            row("T1", "random", 0.0), row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
+            row("T2", "random", 1.0), row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
+        ]
+        result = evaluation_claim_preflight(
+            rows,
+            expected_test_tasks=2,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            paired_advantage_ci_lower_bound=0.1,
+        )
+        self.assertTrue(result["eligible"])
+        self.assertTrue(result["claim_accepted"])
+        self.assertEqual(result["paired_mean_difference"], 0.5)
 
     def test_incomplete_or_unpaired_arms_fail(self):
         result = evaluation_claim_preflight(
@@ -80,6 +100,28 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         )
         self.assertFalse(result["eligible"])
         self.assertIn("unique_task_ids_per_arm", result["blocking_reasons"])
+
+    def test_missing_null_malformed_nonfinite_and_out_of_range_outcomes_fail(self):
+        invalid = (None, "1.0", float("nan"), float("inf"), -0.1, 1.1)
+        for value in invalid:
+            with self.subTest(value=value):
+                rows = [
+                    row(task, mode, 1.0)
+                    for task in ("T1", "T2")
+                    for mode in ("random", "cold_adaptive", "adaptive")
+                ]
+                rows[-1]["holdout_exact"] = value
+                result = evaluation_claim_preflight(
+                    rows,
+                    expected_test_tasks=2,
+                    configured_budget_per_task=10,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    paired_advantage_ci_lower_bound=0.1,
+                )
+                self.assertFalse(result["eligible"])
+                self.assertIn("valid_correctness_outcomes", result["blocking_reasons"])
 
 
 if __name__ == "__main__":
