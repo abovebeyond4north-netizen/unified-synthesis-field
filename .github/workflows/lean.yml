@@ -18,22 +18,60 @@ jobs:
           curl -fsSL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh -o /tmp/elan-init.sh
           sh /tmp/elan-init.sh -y --default-toolchain leanprover/lean4:v4.28.0
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - name: Resolve pinned Mathlib release
-        run: lake update
+      - name: Validate committed dependency lock
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path("lake-manifest.json").read_text())
+          packages = manifest["packages"]
+          names = [package["name"] for package in packages]
+          assert len(names) == len(set(names)), f"duplicate packages: {names}"
+          mathlib = next(package for package in packages if package["name"] == "mathlib")
+          assert mathlib["inputRev"] == "v4.28.0", mathlib
+          assert mathlib["rev"] == "8f9d9cff6bd728b17a24e163c9402775d9e6a365", mathlib
+          assert Path("lean-toolchain").read_text().strip() == "leanprover/lean4:v4.28.0"
+          print(f"Validated {len(packages)} locked Lean packages")
+          PY
       - name: Download Mathlib compiled cache
         run: lake exe cache get
-      - name: Compile Lean smoke theorem and print axioms
+      - name: Compile static Lean smoke theorem
         run: lake env lean lean/USF.lean | tee lean_axioms.txt
-      - name: Strict axiom allowlist audit
+      - name: Strict static axiom allowlist audit
         run: |
           python - <<'PY'
           from pathlib import Path
           from usf06.logos import parse_axiom_output
-          output = Path('lean_axioms.txt').read_text()
-          allowed = {'propext', 'Classical.choice', 'Quot.sound'}
-          observed = parse_axiom_output(output, 'USF.ring_example')
-          assert observed is not None, f'Missing axiom report: {output}'
-          assert set(observed).issubset(allowed), f'Unapproved axioms: {observed}'
-          assert 'sorryAx' not in output
-          print('Lean axiom audit passed:', observed)
+
+          output = Path("lean_axioms.txt").read_text()
+          allowed = {"propext", "Classical.choice", "Quot.sound"}
+          observed = parse_axiom_output(output, "USF.ring_example")
+          assert observed is not None, f"Missing axiom report: {output}"
+          assert set(observed).issubset(allowed), f"Unapproved axioms: {observed}"
+          assert "sorryAx" not in output
+          print("Lean static axiom audit passed:", observed)
+          PY
+      - name: Exercise generated candidate through LogosGate
+        run: |
+          python - <<'PY'
+          from usf06.core import Expr, expr
+          from usf06.logos import LogosGate
+
+          x = Expr.var()
+          candidate = expr(
+              "add",
+              expr("mul", x, x),
+              expr("add", expr("mul", Expr.const(2), x), Expr.const(1)),
+          )
+          target = expr("mul", expr("add", x, Expr.const(1)), expr("add", x, Expr.const(1)))
+          result = LogosGate(".", timeout_s=60).verify(
+              candidate,
+              target,
+              "usf_ci_generated_equivalence",
+          )
+          assert result.status == "KERNEL_VERIFIED", result
+          assert result.kernel_verified and result.axiom_audit_pass, result
+          assert "sorryAx" not in result.diagnostics
+          print("Generated LogosGate proof passed:", result.axioms)
           PY
