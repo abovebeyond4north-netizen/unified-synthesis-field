@@ -58,7 +58,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertFalse(result["claim_accepted"])
         self.assertIn("bootstrap_95pct_lower_bound_exceeds_zero", result["claim_blocking_reasons"])
 
-    def test_complete_claim_requires_positive_effect_and_confidence_bound(self):
+    def test_forged_confidence_bound_cannot_accept_claim(self):
         rows = [
             row("T1", "random", 0.0), row("T1", "cold_adaptive", 0.0), row("T1", "adaptive", 1.0),
             row("T2", "random", 1.0), row("T2", "cold_adaptive", 1.0), row("T2", "adaptive", 1.0),
@@ -70,11 +70,78 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             concealed_evaluator=True,
             independent_administration=True,
             matched_wall_budget_enforced=True,
-            paired_advantage_ci_lower_bound=0.1,
+            bootstrap_seed=1234,
+            paired_advantage_ci_lower_bound=0.9,
+        )
+        self.assertTrue(result["eligible"])
+        self.assertFalse(result["claim_accepted"])
+        self.assertEqual(result["paired_mean_difference"], 0.5)
+        self.assertEqual(result["paired_advantage_bootstrap_95pct_CI"], [0.0, 1.0])
+        self.assertFalse(result["claim_checks"]["reported_bootstrap_lower_bound_consistent"])
+
+    def test_recomputed_positive_bound_can_accept_claim(self):
+        rows = []
+        for i in range(20):
+            task = f"T{i:02d}"
+            baseline = 1.0 if i == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        result = evaluation_claim_preflight(
+            rows,
+            expected_test_tasks=20,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
         )
         self.assertTrue(result["eligible"])
         self.assertTrue(result["claim_accepted"])
-        self.assertEqual(result["paired_mean_difference"], 0.5)
+        self.assertEqual(result["paired_mean_difference"], 0.95)
+        self.assertGreater(result["paired_advantage_ci_lower_bound"], 0.0)
+        replay = evaluation_claim_preflight(
+            rows,
+            expected_test_tasks=20,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+        )
+        self.assertEqual(
+            result["paired_advantage_bootstrap_95pct_CI"],
+            replay["paired_advantage_bootstrap_95pct_CI"],
+        )
+
+    def test_missing_or_invalid_bootstrap_configuration_fails_closed(self):
+        rows = []
+        for i in range(20):
+            task = f"T{i:02d}"
+            baseline = 1.0 if i == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        for seed, iterations in ((None, 2000), (True, 2000), ("1234", 2000), (1234, 1999), (1234, True)):
+            with self.subTest(seed=seed, iterations=iterations):
+                result = evaluation_claim_preflight(
+                    rows,
+                    expected_test_tasks=20,
+                    configured_budget_per_task=160,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=seed,
+                    bootstrap_iterations=iterations,
+                )
+                self.assertTrue(result["eligible"])
+                self.assertFalse(result["claim_accepted"])
+                self.assertFalse(result["claim_checks"]["recorded_bootstrap_configuration"])
+                self.assertEqual(result["paired_advantage_bootstrap_95pct_CI"], [None, None])
 
 
     def test_configuration_evidence_requires_literal_true(self):
@@ -101,7 +168,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
                         rows,
                         expected_test_tasks=2,
                         configured_budget_per_task=160,
-                        paired_advantage_ci_lower_bound=0.1,
+                        bootstrap_seed=1234,
                         **options,
                     )
                     self.assertFalse(result["eligible"])

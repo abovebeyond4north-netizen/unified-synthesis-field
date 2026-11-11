@@ -8,10 +8,34 @@ from __future__ import annotations
 
 from collections import Counter
 import math
+import random
 from typing import Iterable, Mapping
 
 
 REQUIRED_ARMS = ("random", "cold_adaptive", "adaptive")
+REQUIRED_BOOTSTRAP_ITERATIONS = 2000
+
+
+def paired_bootstrap_interval(
+    differences: list[float], seed: int, iterations: int = REQUIRED_BOOTSTRAP_ITERATIONS
+) -> list[float | None]:
+    """Recompute the deterministic paired-bootstrap interval used by the benchmark."""
+    if not differences:
+        return [None, None]
+    if type(seed) is not int:
+        raise ValueError("bootstrap seed must be an integer")
+    if type(iterations) is not int or iterations < 1:
+        raise ValueError("bootstrap iterations must be a positive integer")
+    rng = random.Random(seed)
+    n = len(differences)
+    values = sorted(
+        sum(differences[rng.randrange(n)] for _ in range(n)) / n
+        for _ in range(iterations)
+    )
+    return [
+        round(values[int(.025 * (iterations - 1))], 4),
+        round(values[int(.975 * (iterations - 1))], 4),
+    ]
 
 
 def evaluation_claim_preflight(
@@ -22,6 +46,8 @@ def evaluation_claim_preflight(
     concealed_evaluator: bool = False,
     independent_administration: bool = False,
     matched_wall_budget_enforced: bool = False,
+    bootstrap_seed: int | None = None,
+    bootstrap_iterations: int = REQUIRED_BOOTSTRAP_ITERATIONS,
     paired_advantage_ci_lower_bound: float | None = None,
 ) -> dict[str, object]:
     """Return a canonical, fail-closed claim-eligibility summary.
@@ -84,17 +110,60 @@ def evaluation_claim_preflight(
     }
     lost_ids = sorted(positive_ids - retained_ids)
 
+    paired_differences: list[float] = []
     paired_mean_difference = None
     if paired_tasks and valid_task_ids and valid_outcomes:
-        paired_mean_difference = sum(
+        paired_task_ids = [
+            str(row["task_id"])
+            for row in materialized
+            if row.get("mode") == "adaptive"
+        ]
+        paired_differences = [
             float(candidate[task_id]["holdout_exact"])
             - float(baseline[task_id]["holdout_exact"])
-            for task_id in sorted(tasks_by_arm["adaptive"])
-        ) / expected_test_tasks
+            for task_id in paired_task_ids
+        ]
+        paired_mean_difference = sum(paired_differences) / expected_test_tasks
 
-    valid_ci_lower_bound = valid_outcome(paired_advantage_ci_lower_bound)
+    valid_bootstrap_configuration = (
+        type(bootstrap_seed) is int
+        and type(bootstrap_iterations) is int
+        and bootstrap_iterations == REQUIRED_BOOTSTRAP_ITERATIONS
+    )
+    bootstrap_interval: list[float | None] = [None, None]
+    if paired_differences and valid_bootstrap_configuration:
+        bootstrap_interval = paired_bootstrap_interval(
+            paired_differences,
+            bootstrap_seed,
+            bootstrap_iterations,
+        )
+    computed_ci_lower_bound = bootstrap_interval[0]
+
+    def valid_reported_bound(value: object) -> bool:
+        return (
+            type(value) in (int, float)
+            and math.isfinite(float(value))
+            and -1.0 <= float(value) <= 1.0
+        )
+
+    reported_bound_consistent = (
+        paired_advantage_ci_lower_bound is None
+        or (
+            valid_reported_bound(paired_advantage_ci_lower_bound)
+            and computed_ci_lower_bound is not None
+            and math.isclose(
+                float(paired_advantage_ci_lower_bound),
+                computed_ci_lower_bound,
+                abs_tol=1e-12,
+            )
+        )
+    )
     paired_advantage = paired_mean_difference is not None and paired_mean_difference > 0.0
-    statistical_requirement = valid_ci_lower_bound and float(paired_advantage_ci_lower_bound) > 0.0
+    statistical_requirement = (
+        computed_ci_lower_bound is not None
+        and computed_ci_lower_bound > 0.0
+        and reported_bound_consistent
+    )
 
     checks = {
         "complete_required_arms": complete_arms,
@@ -113,6 +182,8 @@ def evaluation_claim_preflight(
     claim_checks = {
         "preliminary_eligibility": not blocking,
         "positive_paired_candidate_advantage": paired_advantage,
+        "recorded_bootstrap_configuration": valid_bootstrap_configuration,
+        "reported_bootstrap_lower_bound_consistent": reported_bound_consistent,
         "bootstrap_95pct_lower_bound_exceeds_zero": statistical_requirement,
     }
     claim_blocking = [name for name, value in claim_checks.items() if not value]
@@ -130,7 +201,11 @@ def evaluation_claim_preflight(
         "retained_positive_baseline_successes": len(retained_ids),
         "lost_positive_baseline_task_ids": lost_ids,
         "paired_mean_difference": paired_mean_difference,
-        "paired_advantage_ci_lower_bound": paired_advantage_ci_lower_bound,
+        "paired_advantage_bootstrap_95pct_CI": bootstrap_interval,
+        "paired_advantage_ci_lower_bound": computed_ci_lower_bound,
+        "reported_paired_advantage_ci_lower_bound": paired_advantage_ci_lower_bound,
+        "bootstrap_seed": bootstrap_seed,
+        "bootstrap_iterations": bootstrap_iterations,
         "checks": checks,
         "claim_checks": claim_checks,
         "interpretation": "preliminary eligibility and claim acceptance are necessary gates, not proof of independence, learning, or general intelligence",
