@@ -1,0 +1,79 @@
+{
+  "protocol_version": "USF-MA-CONCEALED-CLAIM-1",
+  "status": "preregistered_not_executed",
+  "purpose": "Fail-closed Milestone A evaluation contract for concealed target-free rediscovery; passing is necessary but not sufficient for a capability claim.",
+  "frozen_arms": [
+    {
+      "name": "random",
+      "role": "non_learning_comparator"
+    },
+    {
+      "name": "cold_adaptive",
+      "role": "causal_no_memory_ablation"
+    },
+    {
+      "name": "adaptive",
+      "role": "candidate"
+    }
+  ],
+  "target_generation": {
+    "operator": "separately_authorized_evaluator",
+    "process_boundary": "target seed and target AST remain outside candidate/search process",
+    "public_inputs": [
+      "training observations",
+      "task identifier",
+      "protocol commitment"
+    ],
+    "commitment": "SHA-256 commitment required before any arm executes",
+    "reveal": "only after every frozen arm completes or times out",
+    "repository_target_material_forbidden": true
+  },
+  "splits": {
+    "development": "may be used to implement the protocol but not to set final thresholds after evaluation",
+    "regression": "public deterministic contract tests only",
+    "confirmation": "fresh evaluator-generated targets unavailable to development and repository code before freeze"
+  },
+  "matched_budget": {
+    "unique_candidate_evaluations_per_task": 160,
+    "wall_seconds_per_arm_per_task": 30,
+    "stop_rule": "first of candidate-evaluation cap or wall deadline",
+    "setup_inclusive_wall_time_required": true,
+    "identical_task_ids_and_order": true
+  },
+  "acceptance": {
+    "complete_rows_for_every_arm": true,
+    "minimum_positive_cold_adaptive_successes": 1,
+    "retain_all_positive_cold_adaptive_successes": true,
+    "paired_candidate_advantage_required": true,
+    "bootstrap_95pct_lower_bound_must_exceed": 0,
+    "kernel_verified_successes_reported_separately": true,
+    "promotion_disabled_without_independent_administration": true
+  },
+  "receipts": [
+    "protocol_sha256",
+    "source_bundle_sha256",
+    "target_commitment",
+    "evaluator_sha256",
+    "per_arm_task_order",
+    "candidate_evaluations",
+    "setup_inclusive_wall_seconds",
+    "all_failures",
+    "post_evaluation_target_reveal",
+    "ledger_integrity"
+  ],
+  "automatic_blockers": [
+    "zero positive no-memory baseline successes",
+    "missing or unpaired arm rows",
+    "lost positive baseline success",
+    "unmatched wall or candidate budgets",
+    "target material visible to candidate process",
+    "protocol or source digest mismatch",
+    "same-operator execution presented as independent"
+  ],
+  "limitations": [
+    "synthetic integer-polynomial domain",
+    "handwritten mutation vocabulary",
+    "protocol infrastructure is not an executed result",
+    "not evidence of representation invention or general intelligence"
+  ]
+}
