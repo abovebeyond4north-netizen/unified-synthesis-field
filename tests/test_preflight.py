@@ -68,6 +68,19 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertFalse(result["eligible"])
         self.assertIn("task_ids_paired_across_arms", result["blocking_reasons"])
 
+    def test_duplicate_task_ids_fail(self):
+        rows = [row("T1", mode, 1.0) for mode in ("random", "cold_adaptive", "adaptive") for _ in range(2)]
+        result = evaluation_claim_preflight(
+            rows,
+            expected_test_tasks=2,
+            configured_budget_per_task=10,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+        )
+        self.assertFalse(result["eligible"])
+        self.assertIn("unique_task_ids_per_arm", result["blocking_reasons"])
+
 
 if __name__ == "__main__":
     unittest.main()
