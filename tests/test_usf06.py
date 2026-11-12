@@ -146,6 +146,10 @@ class SearchAndBenchmarkTests(unittest.TestCase):
             self.assertTrue(report["ledger_integrity"]["verified"])
             self.assertEqual(len(report["test_rows"]), 16)
             self.assertEqual(set(report["methods"]), {"random","evolution","cold_adaptive","adaptive"})
+            self.assertFalse(report["claim_preflight"]["eligible"])
+            self.assertFalse(report["claim_preflight"]["claim_accepted"])
+            self.assertIn("matched_wall_budget_enforced", report["claim_preflight"]["blocking_reasons"])
+            self.assertIn("concealed_evaluator", report["claim_preflight"]["blocking_reasons"])
             self.assertTrue(Path(path).exists())
             self.assertTrue(all(r["lean_status"] != "KERNEL_VERIFIED" for r in report["test_rows"]))
             with Ledger(db) as l:
