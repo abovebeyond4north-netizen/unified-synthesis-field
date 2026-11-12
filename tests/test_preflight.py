@@ -129,7 +129,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertTrue(result["eligible"])
         self.assertTrue(result["claim_accepted"])
         self.assertFalse(result["milestone_a_accepted"])
-        self.assertIn("authenticated_provenance_receipts", result["milestone_a_blocking_reasons"])
+        self.assertIn(
+            "independently_authenticated_provenance",
+            result["milestone_a_blocking_reasons"],
+        )
         self.assertEqual(result["paired_mean_difference"], 0.95)
         self.assertGreater(result["paired_advantage_ci_lower_bound"], 0.0)
         replay = preflight(
@@ -146,7 +149,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             replay["paired_advantage_bootstrap_95pct_CI"],
         )
 
-    def test_matching_provenance_receipts_complete_milestone_a_gate(self):
+    def test_matching_caller_supplied_receipts_do_not_authenticate_milestone_a(self):
         rows = []
         for i in range(20):
             task = f"T{i:02d}"
@@ -173,8 +176,12 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             expected_provenance_receipts=dict(receipts),
         )
         self.assertTrue(result["claim_accepted"])
-        self.assertTrue(result["milestone_a_accepted"])
-        self.assertEqual(result["milestone_a_blocking_reasons"], [])
+        self.assertFalse(result["milestone_a_accepted"])
+        self.assertTrue(result["receipt_strings_match"])
+        self.assertIn(
+            "independently_authenticated_provenance",
+            result["milestone_a_blocking_reasons"],
+        )
         self.assertTrue(all(result["provenance_checks"].values()))
 
     def test_missing_malformed_incomplete_or_mismatched_provenance_fails_closed(self):
@@ -221,7 +228,7 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
                 self.assertTrue(result["claim_accepted"])
                 self.assertFalse(result["milestone_a_accepted"])
                 self.assertIn(
-                    "authenticated_provenance_receipts",
+                    "independently_authenticated_provenance",
                     result["milestone_a_blocking_reasons"],
                 )
 

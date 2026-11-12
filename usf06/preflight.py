@@ -247,10 +247,14 @@ def evaluation_claim_preflight(
         )
         for name in REQUIRED_PROVENANCE_RECEIPTS
     }
-    authenticated_provenance = all(provenance_checks.values())
+    receipt_strings_match = all(provenance_checks.values())
     milestone_a_checks = {
         "statistical_claim_accepted": not claim_blocking,
-        "authenticated_provenance_receipts": authenticated_provenance,
+        "receipt_strings_match": receipt_strings_match,
+        # This in-process preflight only compares caller-supplied strings.  It
+        # cannot authenticate artifact bytes, commitment timing, evaluator
+        # control, or an independently anchored attestation.
+        "independently_authenticated_provenance": False,
     }
     milestone_a_blocking = [
         name for name, value in milestone_a_checks.items() if not value
@@ -264,6 +268,7 @@ def evaluation_claim_preflight(
         "milestone_a_blocking_reasons": milestone_a_blocking,
         "required_provenance_receipts": list(REQUIRED_PROVENANCE_RECEIPTS),
         "provenance_checks": provenance_checks,
+        "receipt_strings_match": receipt_strings_match,
         "milestone_a_checks": milestone_a_checks,
         "required_arms": list(REQUIRED_ARMS),
         "no_memory_ablation": "cold_adaptive",
@@ -284,5 +289,5 @@ def evaluation_claim_preflight(
         "bootstrap_iterations": bootstrap_iterations,
         "checks": checks,
         "claim_checks": claim_checks,
-        "interpretation": "statistical claim acceptance and authenticated provenance are necessary gates for Milestone A, not proof of external independence, learning, or general intelligence",
+        "interpretation": "statistical claim acceptance and matching caller-supplied receipt strings do not authenticate provenance; Milestone A requires a separately controlled verifier that rehashes immutable artifacts and validates pre-run commitments and evaluator attestations",
     }
