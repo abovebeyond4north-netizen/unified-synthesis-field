@@ -2,7 +2,11 @@ import json
 from pathlib import Path
 import unittest
 
-from usf06.preflight import REQUIRED_ARMS, evaluation_claim_preflight
+from usf06.preflight import (
+    REQUIRED_ARMS,
+    REQUIRED_PROVENANCE_RECEIPTS,
+    evaluation_claim_preflight,
+)
 
 
 def row(task, mode, exact):
@@ -124,6 +128,8 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         )
         self.assertTrue(result["eligible"])
         self.assertTrue(result["claim_accepted"])
+        self.assertFalse(result["milestone_a_accepted"])
+        self.assertIn("authenticated_provenance_receipts", result["milestone_a_blocking_reasons"])
         self.assertEqual(result["paired_mean_difference"], 0.95)
         self.assertGreater(result["paired_advantage_ci_lower_bound"], 0.0)
         replay = preflight(
@@ -139,6 +145,85 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             result["paired_advantage_bootstrap_95pct_CI"],
             replay["paired_advantage_bootstrap_95pct_CI"],
         )
+
+    def test_matching_provenance_receipts_complete_milestone_a_gate(self):
+        rows = []
+        for i in range(20):
+            task = f"T{i:02d}"
+            baseline = 1.0 if i == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "evolution", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        receipts = {
+            name: f"{index + 1:064x}"
+            for index, name in enumerate(REQUIRED_PROVENANCE_RECEIPTS)
+        }
+        result = preflight(
+            rows,
+            expected_test_tasks=20,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+            provenance_receipts=receipts,
+            expected_provenance_receipts=dict(receipts),
+        )
+        self.assertTrue(result["claim_accepted"])
+        self.assertTrue(result["milestone_a_accepted"])
+        self.assertEqual(result["milestone_a_blocking_reasons"], [])
+        self.assertTrue(all(result["provenance_checks"].values()))
+
+    def test_missing_malformed_incomplete_or_mismatched_provenance_fails_closed(self):
+        rows = []
+        for i in range(20):
+            task = f"T{i:02d}"
+            baseline = 1.0 if i == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "evolution", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        expected = {
+            name: f"{index + 1:064x}"
+            for index, name in enumerate(REQUIRED_PROVENANCE_RECEIPTS)
+        }
+        malformed = dict(expected)
+        malformed["protocol_sha256"] = "not-a-sha256"
+        incomplete = dict(expected)
+        incomplete.pop("target_commitment")
+        mismatched = dict(expected)
+        mismatched["evaluator_sha256"] = "f" * 64
+        cases = (
+            None,
+            "serialized-but-unauthenticated",
+            malformed,
+            incomplete,
+            mismatched,
+        )
+        for receipts in cases:
+            with self.subTest(receipts=receipts):
+                result = preflight(
+                    rows,
+                    expected_test_tasks=20,
+                    configured_budget_per_task=160,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=1234,
+                    provenance_receipts=receipts,
+                    expected_provenance_receipts=expected,
+                )
+                self.assertTrue(result["claim_accepted"])
+                self.assertFalse(result["milestone_a_accepted"])
+                self.assertIn(
+                    "authenticated_provenance_receipts",
+                    result["milestone_a_blocking_reasons"],
+                )
 
     def test_missing_or_invalid_bootstrap_configuration_fails_closed(self):
         rows = []
@@ -318,6 +403,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertEqual(
             [arm["name"] for arm in protocol["frozen_arms"]],
             list(REQUIRED_ARMS),
+        )
+        self.assertEqual(
+            protocol["receipts"][:4],
+            list(REQUIRED_PROVENANCE_RECEIPTS),
         )
         self.assertIn("missing evolutionary comparator rows", protocol["automatic_blockers"])
         self.assertIn(

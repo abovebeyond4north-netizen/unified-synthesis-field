@@ -7,12 +7,19 @@ contract.  Passing this preflight is necessary, never sufficient, for a claim.
 from __future__ import annotations
 
 from collections import Counter
+import hmac
 import math
 import random
 from typing import Iterable, Mapping
 
 
 REQUIRED_ARMS = ("random", "evolution", "cold_adaptive", "adaptive")
+REQUIRED_PROVENANCE_RECEIPTS = (
+    "protocol_sha256",
+    "source_bundle_sha256",
+    "target_commitment",
+    "evaluator_sha256",
+)
 REQUIRED_BOOTSTRAP_ITERATIONS = 2000
 
 
@@ -50,15 +57,18 @@ def evaluation_claim_preflight(
     bootstrap_seed: int | None = None,
     bootstrap_iterations: int = REQUIRED_BOOTSTRAP_ITERATIONS,
     paired_advantage_ci_lower_bound: float | None = None,
+    provenance_receipts: Mapping[str, object] | None = None,
+    expected_provenance_receipts: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Return a canonical, fail-closed claim-eligibility summary.
 
     ``cold_adaptive`` is the causal no-memory ablation: it uses the same
     adaptive search implementation with a fresh policy.  Random and evolution
     are retained as distinct non-learning comparators.  The function cannot infer
-    concealment, independence, wall-budget enforcement, or the intended task
-    order from result rows.  Those properties must be supplied by the frozen
-    execution contract.
+    concealment, independence, wall-budget enforcement, the intended task
+    order, or provenance authenticity from result rows.  Those properties must
+    be supplied by the frozen execution contract.  Statistical acceptance is
+    reported separately from complete Milestone A acceptance.
     """
     if expected_test_tasks < 1 or configured_budget_per_task < 1:
         raise ValueError("expected tasks and configured budget must be positive")
@@ -210,11 +220,51 @@ def evaluation_claim_preflight(
         "bootstrap_95pct_lower_bound_exceeds_zero": statistical_requirement,
     }
     claim_blocking = [name for name, value in claim_checks.items() if not value]
+
+    recorded_receipts = (
+        dict(provenance_receipts)
+        if isinstance(provenance_receipts, Mapping)
+        else {}
+    )
+    frozen_receipts = (
+        dict(expected_provenance_receipts)
+        if isinstance(expected_provenance_receipts, Mapping)
+        else {}
+    )
+
+    def valid_sha256(value: object) -> bool:
+        return (
+            isinstance(value, str)
+            and len(value) == 64
+            and all(character in "0123456789abcdef" for character in value)
+        )
+
+    provenance_checks = {
+        name: (
+            valid_sha256(recorded_receipts.get(name))
+            and valid_sha256(frozen_receipts.get(name))
+            and hmac.compare_digest(recorded_receipts[name], frozen_receipts[name])
+        )
+        for name in REQUIRED_PROVENANCE_RECEIPTS
+    }
+    authenticated_provenance = all(provenance_checks.values())
+    milestone_a_checks = {
+        "statistical_claim_accepted": not claim_blocking,
+        "authenticated_provenance_receipts": authenticated_provenance,
+    }
+    milestone_a_blocking = [
+        name for name, value in milestone_a_checks.items() if not value
+    ]
     return {
         "eligible": not blocking,
         "blocking_reasons": blocking,
         "claim_accepted": not claim_blocking,
         "claim_blocking_reasons": claim_blocking,
+        "milestone_a_accepted": not milestone_a_blocking,
+        "milestone_a_blocking_reasons": milestone_a_blocking,
+        "required_provenance_receipts": list(REQUIRED_PROVENANCE_RECEIPTS),
+        "provenance_checks": provenance_checks,
+        "milestone_a_checks": milestone_a_checks,
         "required_arms": list(REQUIRED_ARMS),
         "no_memory_ablation": "cold_adaptive",
         "non_learning_comparator": "random",
@@ -234,5 +284,5 @@ def evaluation_claim_preflight(
         "bootstrap_iterations": bootstrap_iterations,
         "checks": checks,
         "claim_checks": claim_checks,
-        "interpretation": "preliminary eligibility and claim acceptance are necessary gates, not proof of independence, learning, or general intelligence",
+        "interpretation": "statistical claim acceptance and authenticated provenance are necessary gates for Milestone A, not proof of external independence, learning, or general intelligence",
     }
