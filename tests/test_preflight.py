@@ -4,6 +4,7 @@ import unittest
 
 from usf06.preflight import (
     REQUIRED_ARMS,
+    REQUIRED_CANDIDATE_EVALUATIONS_PER_TASK,
     REQUIRED_PROVENANCE_RECEIPTS,
     evaluation_claim_preflight,
 )
@@ -148,6 +149,45 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
             result["paired_advantage_bootstrap_95pct_CI"],
             replay["paired_advantage_bootstrap_95pct_CI"],
         )
+
+    def test_configured_budget_must_match_frozen_integer_contract(self):
+        rows = []
+        for i in range(20):
+            task = f"T{i:02d}"
+            baseline = 1.0 if i == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "evolution", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        invalid_budgets = (1, True, float("inf"), 159, 161, 160.0, "160", None)
+        for configured_budget in invalid_budgets:
+            with self.subTest(configured_budget=configured_budget):
+                result = preflight(
+                    rows,
+                    expected_test_tasks=20,
+                    configured_budget_per_task=configured_budget,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=1234,
+                )
+                self.assertFalse(result["eligible"])
+                self.assertFalse(result["claim_accepted"])
+                self.assertFalse(
+                    result["checks"][
+                        "configured_search_budget_matches_frozen_contract"
+                    ]
+                )
+                self.assertIn(
+                    "configured_search_budget_matches_frozen_contract",
+                    result["blocking_reasons"],
+                )
+                self.assertEqual(
+                    result["required_candidate_evaluations_per_task"],
+                    REQUIRED_CANDIDATE_EVALUATIONS_PER_TASK,
+                )
 
     def test_matching_caller_supplied_receipts_do_not_authenticate_milestone_a(self):
         rows = []
@@ -414,6 +454,10 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertEqual(
             protocol["receipts"][:4],
             list(REQUIRED_PROVENANCE_RECEIPTS),
+        )
+        self.assertEqual(
+            protocol["matched_budget"]["unique_candidate_evaluations_per_task"],
+            REQUIRED_CANDIDATE_EVALUATIONS_PER_TASK,
         )
         self.assertIn("missing evolutionary comparator rows", protocol["automatic_blockers"])
         self.assertIn(

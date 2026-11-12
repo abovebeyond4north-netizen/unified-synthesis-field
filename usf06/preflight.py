@@ -20,6 +20,7 @@ REQUIRED_PROVENANCE_RECEIPTS = (
     "target_commitment",
     "evaluator_sha256",
 )
+REQUIRED_CANDIDATE_EVALUATIONS_PER_TASK = 160
 REQUIRED_BOOTSTRAP_ITERATIONS = 2000
 
 
@@ -70,8 +71,13 @@ def evaluation_claim_preflight(
     be supplied by the frozen execution contract.  Statistical acceptance is
     reported separately from complete Milestone A acceptance.
     """
-    if expected_test_tasks < 1 or configured_budget_per_task < 1:
-        raise ValueError("expected tasks and configured budget must be positive")
+    if type(expected_test_tasks) is not int or expected_test_tasks < 1:
+        raise ValueError("expected tasks must be a positive integer")
+
+    configured_budget_matches_frozen_contract = (
+        type(configured_budget_per_task) is int
+        and configured_budget_per_task == REQUIRED_CANDIDATE_EVALUATIONS_PER_TASK
+    )
 
     materialized = [dict(row) for row in rows]
     required_rows = [row for row in materialized if row.get("mode") in REQUIRED_ARMS]
@@ -206,7 +212,9 @@ def evaluation_claim_preflight(
         "valid_correctness_outcomes": valid_outcomes,
         "positive_no_memory_baseline_successes": len(positive_ids) > 0,
         "all_positive_baseline_successes_retained": not lost_ids,
-        "configured_search_budget_per_task": configured_budget_per_task,
+        "configured_search_budget_matches_frozen_contract": (
+            configured_budget_matches_frozen_contract
+        ),
         "matched_wall_budget_enforced": matched_wall_budget_enforced is True,
         "concealed_evaluator": concealed_evaluator is True,
         "independent_administration": independent_administration is True,
@@ -275,6 +283,10 @@ def evaluation_claim_preflight(
         "non_learning_comparator": "random",
         "evolutionary_comparator": "evolution",
         "expected_test_tasks": expected_test_tasks,
+        "configured_budget_per_task": configured_budget_per_task,
+        "required_candidate_evaluations_per_task": (
+            REQUIRED_CANDIDATE_EVALUATIONS_PER_TASK
+        ),
         "observed_rows_by_arm": {arm: counts[arm] for arm in REQUIRED_ARMS},
         "expected_task_order": task_order_receipt,
         "observed_task_order_by_arm": observed_task_order_by_arm,
