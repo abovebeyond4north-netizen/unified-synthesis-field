@@ -83,11 +83,10 @@ def evaluation_claim_preflight(
     required_rows = [row for row in materialized if row.get("mode") in REQUIRED_ARMS]
 
     def valid_outcome(value: object) -> bool:
-        return (
-            type(value) in (int, float)
-            and math.isfinite(float(value))
-            and 0.0 <= float(value) <= 1.0
-        )
+        # Arbitrarily large Python ints must not overflow during float coercion.
+        if type(value) is int:
+            return 0 <= value <= 1
+        return type(value) is float and math.isfinite(value) and 0.0 <= value <= 1.0
 
     valid_task_ids = all(
         isinstance(row.get("task_id"), str) and bool(row["task_id"].strip())
@@ -178,11 +177,9 @@ def evaluation_claim_preflight(
     computed_ci_lower_bound = bootstrap_interval[0]
 
     def valid_reported_bound(value: object) -> bool:
-        return (
-            type(value) in (int, float)
-            and math.isfinite(float(value))
-            and -1.0 <= float(value) <= 1.0
-        )
+        if type(value) is int:
+            return -1 <= value <= 1
+        return type(value) is float and math.isfinite(value) and -1.0 <= value <= 1.0
 
     reported_bound_consistent = (
         paired_advantage_ci_lower_bound is None
