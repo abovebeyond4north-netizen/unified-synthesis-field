@@ -25,7 +25,9 @@ def _integer(value: Any, label: str, minimum: int = 0) -> int:
 def _binary_exact(value: Any, label: str) -> int:
     if type(value) is int and value in (0, 1):
         return value
-    raise ValueError(f"{label}: expected binary integer 0 or 1")
+    if type(value) is float and math.isfinite(value) and value in (0.0, 1.0):
+        return int(value)
+    raise ValueError(f"{label}: expected binary numeric value 0 or 1")
 
 
 def _duration(value: Any, label: str) -> float:

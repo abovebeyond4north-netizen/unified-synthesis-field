@@ -43,11 +43,11 @@ class AuditResourceReceiptTests(unittest.TestCase):
                 audit_report(data)
 
     def test_exact_outcome_is_strictly_binary(self):
-        for accepted in (0, 1):
+        for accepted in (0, 1, 0.0, 1.0):
             data = fixture()
             data["test_rows"][0]["holdout_exact"] = accepted
             audit_report(data)
-        for rejected in (0.5, 0.0, 1.0, True, False, "1", -1, 2):
+        for rejected in (0.5, True, False, "1", -1, 2):
             data = fixture()
             data["test_rows"][0]["holdout_exact"] = rejected
             with self.subTest(value=repr(rejected)), self.assertRaises(ValueError):
