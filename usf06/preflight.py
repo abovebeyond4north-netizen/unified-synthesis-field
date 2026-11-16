@@ -83,10 +83,15 @@ def evaluation_claim_preflight(
     required_rows = [row for row in materialized if row.get("mode") in REQUIRED_ARMS]
 
     def valid_outcome(value: object) -> bool:
-        # Arbitrarily large Python ints must not overflow during float coercion.
+        # Exact correctness is a binary indicator.  Accept legacy JSON float
+        # endpoints, but reject partial credit and avoid coercing huge integers.
         if type(value) is int:
-            return 0 <= value <= 1
-        return type(value) is float and math.isfinite(value) and 0.0 <= value <= 1.0
+            return value in (0, 1)
+        return (
+            type(value) is float
+            and math.isfinite(value)
+            and value in (0.0, 1.0)
+        )
 
     valid_task_ids = all(
         isinstance(row.get("task_id"), str) and bool(row["task_id"].strip())
