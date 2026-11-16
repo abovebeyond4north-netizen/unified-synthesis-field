@@ -22,13 +22,10 @@ def _integer(value: Any, label: str, minimum: int = 0) -> int:
     return value
 
 
-def _fraction(value: Any, label: str) -> float:
-    if type(value) is int:
-        if 0 <= value <= 1:
-            return float(value)
-    elif type(value) is float and math.isfinite(value) and 0.0 <= value <= 1.0:
+def _binary_exact(value: Any, label: str) -> int:
+    if type(value) is int and value in (0, 1):
         return value
-    raise ValueError(f"{label}: expected finite fraction in [0, 1]")
+    raise ValueError(f"{label}: expected binary integer 0 or 1")
 
 
 def _duration(value: Any, label: str) -> float:
@@ -73,7 +70,7 @@ def audit_report(report: dict[str, Any]) -> dict[str, Any]:
         if row["proposals"] > budget:
             raise ValueError(f"row {index}: proposals exceed configured budget")
         _integer(row.get("attempts"), f"row {index}.attempts")
-        _fraction(row.get("holdout_exact"), f"row {index}.holdout_exact")
+        _binary_exact(row.get("holdout_exact"), f"row {index}.holdout_exact")
         _duration(row.get("formal_elapsed_s"), f"row {index}.formal_elapsed_s")
         if "setup_inclusive_wall_s" in row:
             _duration(row["setup_inclusive_wall_s"], f"row {index}.setup_inclusive_wall_s")

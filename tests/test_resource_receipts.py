@@ -42,6 +42,17 @@ class AuditResourceReceiptTests(unittest.TestCase):
             with self.subTest(alteration=alteration), self.assertRaises(ValueError):
                 audit_report(data)
 
+    def test_exact_outcome_is_strictly_binary(self):
+        for accepted in (0, 1):
+            data = fixture()
+            data["test_rows"][0]["holdout_exact"] = accepted
+            audit_report(data)
+        for rejected in (0.5, 0.0, 1.0, True, False, "1", -1, 2):
+            data = fixture()
+            data["test_rows"][0]["holdout_exact"] = rejected
+            with self.subTest(value=repr(rejected)), self.assertRaises(ValueError):
+                audit_report(data)
+
     def test_reject_malformed_numeric_and_unpaired_evidence(self):
         for field, value in (("attempts", -1), ("proposals", 11),
                              ("holdout_exact", float("nan")),
