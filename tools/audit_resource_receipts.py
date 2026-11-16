@@ -23,15 +23,22 @@ def _integer(value: Any, label: str, minimum: int = 0) -> int:
 
 
 def _fraction(value: Any, label: str) -> float:
-    if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1:
-        raise ValueError(f"{label}: expected finite fraction in [0, 1]")
-    return float(value)
+    if type(value) is int:
+        if 0 <= value <= 1:
+            return float(value)
+    elif type(value) is float and math.isfinite(value) and 0.0 <= value <= 1.0:
+        return value
+    raise ValueError(f"{label}: expected finite fraction in [0, 1]")
 
 
 def _duration(value: Any, label: str) -> float:
-    if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
-        raise ValueError(f"{label}: expected finite nonnegative duration")
-    return float(value)
+    # Reject absurd or overflowing int evidence before any float coercion.
+    if type(value) is int:
+        if 0 <= value <= 10**12:
+            return float(value)
+    elif type(value) is float and math.isfinite(value) and 0.0 <= value <= 1e12:
+        return value
+    raise ValueError(f"{label}: expected finite duration in [0, 1e12]")
 
 
 def audit_report(report: dict[str, Any]) -> dict[str, Any]:
