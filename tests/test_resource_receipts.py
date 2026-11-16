@@ -46,7 +46,9 @@ class AuditResourceReceiptTests(unittest.TestCase):
         for field, value in (("attempts", -1), ("proposals", 11),
                              ("holdout_exact", float("nan")),
                              ("formal_elapsed_s", float("inf")),
-                             ("attempts", True), ("proposals", 10 ** 400)):
+                             ("attempts", True), ("proposals", 10 ** 400),
+                             ("holdout_exact", 10 ** 400),
+                             ("formal_elapsed_s", 10 ** 400)):
             data = fixture()
             data["test_rows"][0][field] = value
             with self.subTest(field=field, value=str(value)[:30]), self.assertRaises(ValueError):
