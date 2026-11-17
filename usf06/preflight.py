@@ -81,12 +81,21 @@ def evaluation_claim_preflight(
 
     materialized = [dict(row) for row in rows]
     required_rows = [row for row in materialized if row.get("mode") in REQUIRED_ARMS]
+    unexpected_modes = sorted({
+        str(row.get("mode"))
+        for row in materialized
+        if row.get("mode") not in REQUIRED_ARMS
+    })
 
     def valid_outcome(value: object) -> bool:
+        # Exact correctness is a binary indicator.  Accept legacy JSON float
+        # endpoints, but reject partial credit and avoid coercing huge integers.
+        if type(value) is int:
+            return value in (0, 1)
         return (
-            type(value) in (int, float)
-            and math.isfinite(float(value))
-            and 0.0 <= float(value) <= 1.0
+            type(value) is float
+            and math.isfinite(value)
+            and value in (0.0, 1.0)
         )
 
     valid_task_ids = all(
@@ -178,11 +187,9 @@ def evaluation_claim_preflight(
     computed_ci_lower_bound = bootstrap_interval[0]
 
     def valid_reported_bound(value: object) -> bool:
-        return (
-            type(value) in (int, float)
-            and math.isfinite(float(value))
-            and -1.0 <= float(value) <= 1.0
-        )
+        if type(value) is int:
+            return -1 <= value <= 1
+        return type(value) is float and math.isfinite(value) and -1.0 <= value <= 1.0
 
     reported_bound_consistent = (
         paired_advantage_ci_lower_bound is None
@@ -204,6 +211,7 @@ def evaluation_claim_preflight(
     )
 
     checks = {
+        "only_required_arms_present": not unexpected_modes,
         "complete_required_arms": complete_arms,
         "valid_task_ids": valid_task_ids,
         "unique_task_ids_per_arm": unique_task_ids,
@@ -279,6 +287,7 @@ def evaluation_claim_preflight(
         "receipt_strings_match": receipt_strings_match,
         "milestone_a_checks": milestone_a_checks,
         "required_arms": list(REQUIRED_ARMS),
+        "unexpected_modes": unexpected_modes,
         "no_memory_ablation": "cold_adaptive",
         "non_learning_comparator": "random",
         "evolutionary_comparator": "evolution",

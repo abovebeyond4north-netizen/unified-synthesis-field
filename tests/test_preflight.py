@@ -84,6 +84,38 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertFalse(result["claim_accepted"])
         self.assertIn("bootstrap_95pct_lower_bound_exceeds_zero", result["claim_blocking_reasons"])
 
+    def test_unexpected_mode_fails_closed(self):
+        rows = [
+            row(task, mode, 1.0)
+            for task in ("T1", "T2")
+            for mode in MODES
+        ]
+        control = preflight(
+            rows,
+            expected_test_tasks=2,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+        )
+        self.assertTrue(control["eligible"])
+
+        rows.append(row("T1", "unexpected_mode", "not-even-numeric"))
+        result = preflight(
+            rows,
+            expected_test_tasks=2,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+        )
+        self.assertFalse(result["eligible"])
+        self.assertFalse(result["claim_accepted"])
+        self.assertEqual(result["unexpected_modes"], ["unexpected_mode"])
+        self.assertIn("only_required_arms_present", result["blocking_reasons"])
+
     def test_forged_confidence_bound_cannot_accept_claim(self):
         rows = [
             row("T1", "random", 0.0), row("T1", "evolution", 0.0),
@@ -381,6 +413,93 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
                 )
                 self.assertFalse(result["eligible"])
                 self.assertIn("valid_correctness_outcomes", result["blocking_reasons"])
+
+
+    def test_exact_outcomes_use_binary_contract(self):
+        base = [row(task, mode, 1.0) for task in ("T1", "T2") for mode in MODES]
+        for accepted in (0, 1, 0.0, 1.0):
+            with self.subTest(accepted=repr(accepted)):
+                changed = [dict(item) for item in base]
+                changed[-1]["holdout_exact"] = accepted
+                result = preflight(
+                    changed,
+                    expected_test_tasks=2,
+                    configured_budget_per_task=160,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=1234,
+                )
+                self.assertTrue(result["checks"]["valid_correctness_outcomes"])
+        for malformed in (0.5, True, False, "1"):
+            with self.subTest(malformed=repr(malformed)):
+                changed = [dict(item) for item in base]
+                changed[-1]["holdout_exact"] = malformed
+                result = preflight(
+                    changed,
+                    expected_test_tasks=2,
+                    configured_budget_per_task=160,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=1234,
+                )
+                self.assertFalse(result["eligible"])
+                self.assertFalse(result["claim_accepted"])
+                self.assertIn("valid_correctness_outcomes", result["blocking_reasons"])
+
+
+    def test_oversized_integer_outcomes_fail_closed_without_overflow(self):
+        rows = [row(task, mode, 1.0) for task in ("T1", "T2") for mode in MODES]
+        for malformed in (10**400, -(10**400)):
+            with self.subTest(malformed_sign=malformed > 0):
+                changed = [dict(item) for item in rows]
+                changed[-1]["holdout_exact"] = malformed
+                result = preflight(
+                    changed,
+                    expected_test_tasks=2,
+                    configured_budget_per_task=160,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=1234,
+                )
+                self.assertFalse(result["eligible"])
+                self.assertFalse(result["claim_accepted"])
+                self.assertFalse(result["milestone_a_accepted"])
+                self.assertIn("valid_correctness_outcomes", result["blocking_reasons"])
+
+    def test_oversized_integer_reported_bounds_fail_closed_without_overflow(self):
+        rows = []
+        for index in range(20):
+            task = f"T{index:02d}"
+            baseline = 1.0 if index == 0 else 0.0
+            rows.extend((
+                row(task, "random", 0.0),
+                row(task, "evolution", 0.0),
+                row(task, "cold_adaptive", baseline),
+                row(task, "adaptive", 1.0),
+            ))
+        for malformed in (10**400, -(10**400)):
+            with self.subTest(malformed_sign=malformed > 0):
+                result = preflight(
+                    rows,
+                    expected_test_tasks=20,
+                    configured_budget_per_task=160,
+                    concealed_evaluator=True,
+                    independent_administration=True,
+                    matched_wall_budget_enforced=True,
+                    bootstrap_seed=1234,
+                    paired_advantage_ci_lower_bound=malformed,
+                )
+                self.assertTrue(result["eligible"])
+                self.assertFalse(result["claim_accepted"])
+                self.assertFalse(result["milestone_a_accepted"])
+                self.assertFalse(result["claim_checks"]["reported_bootstrap_lower_bound_consistent"])
+                self.assertIn(
+                    "reported_bootstrap_lower_bound_consistent",
+                    result["claim_blocking_reasons"],
+                )
 
     def test_missing_evolutionary_comparator_fails_closed(self):
         rows = []
