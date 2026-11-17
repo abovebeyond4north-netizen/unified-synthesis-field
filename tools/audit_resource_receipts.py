@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 ARMS = ("random", "evolution", "cold_adaptive", "adaptive")
+INITIAL_PROPOSALS = 6
 
 
 def _integer(value: Any, label: str, minimum: int = 0) -> int:
@@ -68,10 +69,14 @@ def audit_report(report: dict[str, Any]) -> dict[str, Any]:
         if task_id in family_by_task and family_by_task[task_id] != family:
             raise ValueError(f"row {index}: family mismatch for task {task_id}")
         family_by_task[task_id] = family
-        _integer(row.get("proposals"), f"row {index}.proposals", 1)
-        if row["proposals"] > budget:
+        proposals = _integer(row.get("proposals"), f"row {index}.proposals", 1)
+        if proposals > budget:
             raise ValueError(f"row {index}: proposals exceed configured budget")
-        _integer(row.get("attempts"), f"row {index}.attempts")
+        attempts = _integer(row.get("attempts"), f"row {index}.attempts")
+        if attempts < max(0, proposals - INITIAL_PROPOSALS):
+            raise ValueError(
+                f"row {index}: attempts cannot produce reported proposals"
+            )
         _binary_exact(row.get("holdout_exact"), f"row {index}.holdout_exact")
         _duration(row.get("formal_elapsed_s"), f"row {index}.formal_elapsed_s")
         if "setup_inclusive_wall_s" in row:
@@ -176,3 +181,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

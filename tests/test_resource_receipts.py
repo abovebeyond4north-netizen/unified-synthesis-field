@@ -69,6 +69,20 @@ class AuditResourceReceiptTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             audit_report(data)
 
+    def test_attempts_cover_non_initial_proposals(self):
+        data = fixture()
+        for row in data["test_rows"]:
+            row["proposals"] = 6
+            row["attempts"] = 0
+        audit_report(data)
+
+        data["test_rows"][0]["proposals"] = 10
+        data["test_rows"][0]["attempts"] = 3
+        with self.assertRaisesRegex(
+            ValueError, "attempts cannot produce reported proposals"
+        ):
+            audit_report(data)
+
     def test_incomplete_wall_receipt_cannot_be_treated_as_measured_compute(self):
         data = fixture()
         data["test_rows"][0]["setup_inclusive_wall_s"] = .5
@@ -120,3 +134,4 @@ class AuditResourceReceiptTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
