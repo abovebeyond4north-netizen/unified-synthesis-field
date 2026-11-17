@@ -81,6 +81,11 @@ def evaluation_claim_preflight(
 
     materialized = [dict(row) for row in rows]
     required_rows = [row for row in materialized if row.get("mode") in REQUIRED_ARMS]
+    unexpected_modes = sorted({
+        str(row.get("mode"))
+        for row in materialized
+        if row.get("mode") not in REQUIRED_ARMS
+    })
 
     def valid_outcome(value: object) -> bool:
         # Exact correctness is a binary indicator.  Accept legacy JSON float
@@ -206,6 +211,7 @@ def evaluation_claim_preflight(
     )
 
     checks = {
+        "only_required_arms_present": not unexpected_modes,
         "complete_required_arms": complete_arms,
         "valid_task_ids": valid_task_ids,
         "unique_task_ids_per_arm": unique_task_ids,
@@ -281,6 +287,7 @@ def evaluation_claim_preflight(
         "receipt_strings_match": receipt_strings_match,
         "milestone_a_checks": milestone_a_checks,
         "required_arms": list(REQUIRED_ARMS),
+        "unexpected_modes": unexpected_modes,
         "no_memory_ablation": "cold_adaptive",
         "non_learning_comparator": "random",
         "evolutionary_comparator": "evolution",

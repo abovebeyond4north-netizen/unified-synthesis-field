@@ -84,6 +84,38 @@ class EvaluationClaimPreflightTests(unittest.TestCase):
         self.assertFalse(result["claim_accepted"])
         self.assertIn("bootstrap_95pct_lower_bound_exceeds_zero", result["claim_blocking_reasons"])
 
+    def test_unexpected_mode_fails_closed(self):
+        rows = [
+            row(task, mode, 1.0)
+            for task in ("T1", "T2")
+            for mode in MODES
+        ]
+        control = preflight(
+            rows,
+            expected_test_tasks=2,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+        )
+        self.assertTrue(control["eligible"])
+
+        rows.append(row("T1", "unexpected_mode", "not-even-numeric"))
+        result = preflight(
+            rows,
+            expected_test_tasks=2,
+            configured_budget_per_task=160,
+            concealed_evaluator=True,
+            independent_administration=True,
+            matched_wall_budget_enforced=True,
+            bootstrap_seed=1234,
+        )
+        self.assertFalse(result["eligible"])
+        self.assertFalse(result["claim_accepted"])
+        self.assertEqual(result["unexpected_modes"], ["unexpected_mode"])
+        self.assertIn("only_required_arms_present", result["blocking_reasons"])
+
     def test_forged_confidence_bound_cannot_accept_claim(self):
         rows = [
             row("T1", "random", 0.0), row("T1", "evolution", 0.0),
