@@ -300,7 +300,8 @@ class PublicSupervisor:
                         and type(r["exact_success"]) is int and r["exact_success"] in (0,1)
                         and type(r["exact_fraction"]) in (int,float) and 0<=r["exact_fraction"]<=1
                         and r["exact_success"]==int(r["exact_fraction"]==1)
-                        and type(r["mae"]) in (int,float) and 0<=r["mae"]<=2*10**12,
+                        and type(r["mae"]) in (int,float) and 0<=r["mae"]<=2*10**12
+                        and (r["mae"]==0)==(r["exact_fraction"]==1),
                         "invalid final receipt")
                 task,_=self._sessions[a]
                 require(task._proc.wait(timeout=self.timeout)==0,"worker failed after final")
