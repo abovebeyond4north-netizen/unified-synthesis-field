@@ -12,8 +12,9 @@ import json
 from .core import Expr, Fit, SealedTask, expr, fit
 from .ledger import Ledger
 from .macro_induction import MacroCandidate
+from .known_composition import BASE_ACTIONS, KNOWN_PAIRS
 
-ACTIONS = ("add_x", "sub_x", "mul_x", "add_one", "sub_one", "mul_two", "negate", "square")
+ACTIONS = BASE_ACTIONS
 INITIAL = (Expr.var(), Expr.const(0), Expr.const(1), Expr.const(-1), Expr.const(2), Expr.const(-2))
 
 
@@ -105,14 +106,17 @@ def _quality(s: Scored) -> float:
 def search(task: SealedTask, budget: int, seed: int, mode: str,
            policy: AdaptivePolicy | None = None, train: bool = False,
            ledger: Ledger | None = None, run_id: str = "", label: str | None = None,
-           *, macro: MacroCandidate | None = None) -> SearchResult:
+           *, macro: MacroCandidate | None = None,
+           known_composition: bool = False) -> SearchResult:
     if mode not in ("random", "evolution", "adaptive"):
         raise ValueError("Unknown comparator")
     if not (6 <= budget <= 20000):
         raise ValueError("budget must be in [6, 20000]")
     if mode == "adaptive" and policy is None:
         raise ValueError("Adaptive mode requires a policy")
-    if macro is not None and (mode != "evolution" or train):
+    if type(known_composition) is not bool or (known_composition and macro is not None):
+        raise ValueError("Choose at most one experimental extension")
+    if (macro is not None or known_composition) and (mode != "evolution" or train):
         raise ValueError("Experimental macro reuse requires frozen evolutionary evaluation")
     if macro is not None and (not isinstance(macro, MacroCandidate) or not 1 <= macro.arity <= 4):
         raise ValueError("Invalid macro candidate")
@@ -154,11 +158,19 @@ def search(task: SealedTask, budget: int, seed: int, mode: str,
         else:
             top = sorted(pool, key=_quality, reverse=True)[:min(12, len(pool))]
             parent = rng.choice(top if rng.random() < 0.85 else pool)
-        if macro is None:
+        if known_composition:
+            action = rng.choice(ACTIONS + ("known_composition",))
+        elif macro is None:
             action = policy.select(rng, True) if mode == "adaptive" else rng.choice(ACTIONS)
         else:
             action = rng.choice(ACTIONS + ("derived_macro",))
-        if action == "derived_macro":
+        if action == "known_composition":
+            # These counters measure extension attempts/proposals in both arms.
+            macro_attempts += 1
+            first, second = rng.choice(KNOWN_PAIRS)
+            candidate = mutate(mutate(parent.candidate, first), second)
+            action = f"known_composition:{first}:{second}"
+        elif action == "derived_macro":
             macro_attempts += 1
             args = [parent.candidate.serial()]
             args.extend(rng.choice(pool).candidate.serial() for _ in range(macro.arity - 1))
@@ -175,7 +187,7 @@ def search(task: SealedTask, budget: int, seed: int, mode: str,
             continue
         current_best = max(pool, key=_quality)
         item = register(candidate, parent, action)
-        if action == "derived_macro":
+        if action == "derived_macro" or action.startswith("known_composition:"):
             macro_proposals += 1
         if train and policy is not None and mode == "adaptive":
             # Credit only independent training improvements; never sees held-out data.
