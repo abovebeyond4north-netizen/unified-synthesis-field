@@ -8,7 +8,8 @@ from dataclasses import dataclass
 import math
 import random
 
-from .core import Expr, Fit, SealedTask, expr, fit
+from .core import Expr, Fit, expr, fit
+from .evaluator_client import ObservationTask
 from .ledger import Ledger
 
 ACTIONS = ("add_x", "sub_x", "mul_x", "add_one", "sub_one", "mul_two", "negate", "square")
@@ -85,7 +86,7 @@ def _quality(s: Scored) -> float:
     return (10000 if s.survived else 0) + s.result.compression_gain_bits
 
 
-def search(task: SealedTask, budget: int, seed: int, mode: str,
+def search(task: ObservationTask, budget: int, seed: int, mode: str,
            policy: AdaptivePolicy | None = None, train: bool = False,
            ledger: Ledger | None = None, run_id: str = "", label: str | None = None) -> SearchResult:
     if mode not in ("random", "evolution", "adaptive"):
