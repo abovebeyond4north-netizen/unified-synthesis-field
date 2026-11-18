@@ -50,5 +50,28 @@ class MacroIdentityTests(unittest.TestCase):
         self.assertEqual(result.selected.candidate.evaluate(3), 9)
 
 
+    def test_normalization_uses_primitive_order_and_constructor_semantics(self):
+        from usf06.core import expr
+        from usf06.search import _normalize_macro_ast
+
+        raw = Expr.from_serial(["add", ["x"], ["const", 3]])
+        normalized = _normalize_macro_ast(raw)
+        self.assertEqual(normalized, expr("add", Expr.var(), Expr.const(3)))
+        self.assertEqual(_normalize_macro_ast(normalized), normalized)
+        for x in (-10000, -1, 0, 1, 10000):
+            self.assertEqual(raw.evaluate(x), normalized.evaluate(x))
+
+        # Construction semantics can erase an overflowing intermediate.
+        # The resulting candidate is scored as the constructed AST, not
+        # certified as equivalent to raw bounded evaluation.
+        square = ["mul", ["x"], ["x"]]
+        raw = Expr.from_serial(["mul", ["const", 0], ["mul", square, square]])
+        with self.assertRaises(OverflowError):
+            raw.evaluate(10000)
+        normalized = _normalize_macro_ast(raw)
+        self.assertEqual(normalized, Expr.const(0))
+        self.assertEqual(normalized.evaluate(10000), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
