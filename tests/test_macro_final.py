@@ -42,6 +42,8 @@ def controlled_report(admit):
         if row["arm"] == "macro":
             row["macro_attempts"] = 10
             row["macro_proposals"] = 3
+    for row, score in zip(report["validation_rows"], report["validation_scores"]):
+        score["exact_fraction"] = float(row["exact_success"])
     report["decision"] = decide_utility(report["manifest"], report["candidate"],
                                         report["validation_rows"])
     return report, final
@@ -98,7 +100,7 @@ class FinalFreezeTests(unittest.TestCase):
 
     def test_forged_decision_and_provenance_rejected_before_freeze(self):
         original, _ = controlled_report(False)
-        for variant in ("decision", "source", "fit", "receipt", "cap"):
+        for variant in ("decision", "source", "fit", "receipt", "cap", "score"):
             report = copy.deepcopy(original)
             if variant == "decision":
                 report["decision"]["admitted"] = True
@@ -108,6 +110,8 @@ class FinalFreezeTests(unittest.TestCase):
                 report["training"][0]["challenge_survived"] = False
             elif variant == "receipt":
                 report["validation_rows"].pop()
+            elif variant == "score":
+                report["validation_scores"][0]["exact_fraction"] = 1.0
             else:
                 report["validation_rows"][0]["proposal_cap"] += 1
             with self.subTest(variant=variant), TemporaryDirectory() as tmp:
