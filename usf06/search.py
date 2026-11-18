@@ -39,6 +39,19 @@ def mutate(h: Expr, action: str) -> Expr:
     raise ValueError("Unknown action")
 
 
+def _normalize_macro_ast(raw: Expr) -> Expr:
+    """Use the same construction semantics as primitive mutation.
+
+    Raw expansion is validated by MacroCandidate.expand (100 nodes / depth 30).
+    Search applies its 23-node / depth-9 caps to the constructed expression.
+    This is constructor canonicalization, not a proof of equivalence between
+    raw and normalized bounded-arithmetic evaluation (e.g. zero multiplication).
+    """
+    if not raw.args:
+        return raw
+    return expr(raw.op, *(_normalize_macro_ast(child) for child in raw.args))
+
+
 class AdaptivePolicy:
     """Across-training-task operator preferences; frozen during held-out evaluation."""
     def __init__(self):
@@ -151,7 +164,9 @@ def search(task: SealedTask, budget: int, seed: int, mode: str,
             args.extend(rng.choice(pool).candidate.serial() for _ in range(macro.arity - 1))
             try:
                 # Expand to the unchanged primitive grammar; charge one mutation attempt.
-                candidate = Expr.from_serial(json.loads(json.dumps(macro.expand(args))))
+                candidate = _normalize_macro_ast(
+                    Expr.from_serial(json.loads(json.dumps(macro.expand(args))))
+                )
             except ValueError:
                 continue
         else:
