@@ -102,6 +102,22 @@ def _verified_macro(report):
         expected_decision = decide_utility(m, c, rows)
         _require(expected_decision["reason"] != "REJECT_INVALID_EVIDENCE", "invalid validation evidence")
         _require(report["decision"] == expected_decision, "decision does not recompute")
+        # Auxiliary score receipts must agree with the binary decision inputs.
+        scores = report["validation_scores"]
+        _require(type(scores) is list and len(scores) == len(rows), "score receipt count")
+        indexed = {(r["seed"], r["task_id"], r["arm"]): r for r in rows}
+        seen = set()
+        for score in scores:
+            key = (score["seed"], score["task_id"], score["arm"])
+            fraction = score["exact_fraction"]
+            _require(key in indexed and key not in seen, "score receipt pairing")
+            _require(type(fraction) in (float, int) and 0 <= fraction <= 1 and
+                     int(fraction == 1) == indexed[key]["exact_success"],
+                     "score receipt outcome mismatch")
+            _require(type(score["score_ns"]) is int and score["score_ns"] >= 0,
+                     "invalid scoring duration")
+            seen.add(key)
+
         _require(type(training) is list and len(training) == len(m["fit_ids"]), "incomplete fit receipts")
         seed = report["development_seed"]
         _require(type(seed) is int and 0 <= seed < 2**63 - 1_000_000, "invalid development seed")
@@ -223,7 +239,7 @@ def run_dev2(seed, directory):
     report = run_dev2_validation(seed)
     _require(report["protocol_sha256"] == digest(protocol_descriptor()), "DEV-2 protocol mismatch")
     expected = freeze_validation(report, frozen_path)
-    # Instantiate final tasks for evaluation only after the commitment is written.
+    # Regenerate final task objects for evaluation after the commitment is written.
     _, final = make_tasks(seed, FIT_TASKS + VALIDATION_TASKS, FINAL_TASKS)
     result = evaluate_frozen(frozen_path, expected, final, final_path)
     return report, result
