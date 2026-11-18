@@ -131,13 +131,22 @@ def audit_report(report: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key!r}")
+        result[key] = value
+    return result
+
+
 def audit_files(paths: list[Path]) -> dict[str, Any]:
     if not paths:
         raise ValueError("at least one report required")
     receipts = []
     seen_seeds: set[int] = set()
     for path in paths:
-        report = json.loads(path.read_text(encoding="utf-8"))
+        report = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_json_object)
         receipt = audit_report(report)
         if receipt["seed"] in seen_seeds:
             raise ValueError(f"duplicate seed {receipt['seed']}")
@@ -158,7 +167,11 @@ def audit_files(paths: list[Path]) -> dict[str, Any]:
                 for mode in ARMS
             },
             "paired_trained_minus_cold_mean": round(
-                sum(r["paired_trained_minus_cold_mean"] * r["task_count"] for r in receipts)
+                sum(
+                    r["arms"]["adaptive"]["exact_task_successes"]
+                    - r["arms"]["cold_adaptive"]["exact_task_successes"]
+                    for r in receipts
+                )
                 / total_tasks, 6
             ),
             "milestones_a_b_c_demonstrated": False,
