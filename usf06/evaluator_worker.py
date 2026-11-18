@@ -89,7 +89,7 @@ def _write(out, message):
     out.flush()
 
 
-def serve(task, session, challenge_cap, inp, out):
+def serve(task, session, challenge_cap, inp, out, *, receipt=None):
     """One observe, then bounded challenge requests; any protocol error closes.
 
     The learner never receives detailed falsification data. Repeats consume
@@ -98,6 +98,8 @@ def serve(task, session, challenge_cap, inp, out):
     if (type(session) is not str or re.fullmatch(r"[0-9a-f]{32}", session) is None
             or type(challenge_cap) is not int or not 1 <= challenge_cap <= MAX_CHALLENGES):
         return 2
+    if receipt is not None:
+        receipt.update(frames=0, request_bytes=0, observations=0, challenges=0)
     expected_seq = 1
     observed = False
     challenges = 0
@@ -110,6 +112,9 @@ def serve(task, session, challenge_cap, inp, out):
         raw = inp.readline(MAX_FRAME + 1)
         if not raw:
             return 0
+        if receipt is not None:
+            receipt['frames'] += 1
+            receipt['request_bytes'] += len(raw)
         try:
             request = _decode(raw)
         except ProtocolError:
@@ -144,12 +149,16 @@ def serve(task, session, challenge_cap, inp, out):
                     return fail("EVALUATOR_FAILURE")
                 response = {"samples": [list(pair) for pair in pairs]}
                 observed = True
+                if receipt is not None:
+                    receipt['observations'] += 1
             else:
                 if not observed:
                     return fail("WRONG_PHASE")
                 if challenges >= challenge_cap:
                     return fail("BUDGET_EXHAUSTED")
                 challenges += 1
+                if receipt is not None:
+                    receipt['challenges'] += 1
                 if set(payload) != {"ast"}:
                     return fail("BAD_PAYLOAD")
                 try:
