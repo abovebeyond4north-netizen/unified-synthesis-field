@@ -7,9 +7,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 import random
+import json
 
 from .core import Expr, Fit, SealedTask, expr, fit
 from .ledger import Ledger
+from .macro_induction import MacroCandidate
 
 ACTIONS = ("add_x", "sub_x", "mul_x", "add_one", "sub_one", "mul_two", "negate", "square")
 INITIAL = (Expr.var(), Expr.const(0), Expr.const(1), Expr.const(-1), Expr.const(2), Expr.const(-2))
@@ -78,6 +80,8 @@ class SearchResult:
     attempts: int
     survived_count: int
     mode: str
+    macro_attempts: int = 0
+    macro_proposals: int = 0
 
 
 def _quality(s: Scored) -> float:
@@ -87,19 +91,26 @@ def _quality(s: Scored) -> float:
 
 def search(task: SealedTask, budget: int, seed: int, mode: str,
            policy: AdaptivePolicy | None = None, train: bool = False,
-           ledger: Ledger | None = None, run_id: str = "", label: str | None = None) -> SearchResult:
+           ledger: Ledger | None = None, run_id: str = "", label: str | None = None,
+           *, macro: MacroCandidate | None = None) -> SearchResult:
     if mode not in ("random", "evolution", "adaptive"):
         raise ValueError("Unknown comparator")
     if not (6 <= budget <= 20000):
         raise ValueError("budget must be in [6, 20000]")
     if mode == "adaptive" and policy is None:
         raise ValueError("Adaptive mode requires a policy")
+    if macro is not None and (mode != "evolution" or train):
+        raise ValueError("Experimental macro reuse requires frozen evolutionary evaluation")
+    if macro is not None and (not isinstance(macro, MacroCandidate) or not 1 <= macro.arity <= 4):
+        raise ValueError("Invalid macro candidate")
     label = label or mode
     rng = random.Random(seed)
     samples = task.training_samples()
     pool: list[Scored] = []
     seen: set[str] = set()
     attempts = 0
+    macro_attempts = 0
+    macro_proposals = 0
 
     def register(ast: Expr, parent: Scored | None, action: str) -> Scored:
         ident = f"{label}:{task.task_id}:{len(pool)+1:05d}"
@@ -130,12 +141,27 @@ def search(task: SealedTask, budget: int, seed: int, mode: str,
         else:
             top = sorted(pool, key=_quality, reverse=True)[:min(12, len(pool))]
             parent = rng.choice(top if rng.random() < 0.85 else pool)
-        action = policy.select(rng, True) if mode == "adaptive" else rng.choice(ACTIONS)
-        candidate = mutate(parent.candidate, action)
+        if macro is None:
+            action = policy.select(rng, True) if mode == "adaptive" else rng.choice(ACTIONS)
+        else:
+            action = rng.choice(ACTIONS + ("derived_macro",))
+        if action == "derived_macro":
+            macro_attempts += 1
+            args = [parent.candidate.serial()]
+            args.extend(rng.choice(pool).candidate.serial() for _ in range(macro.arity - 1))
+            try:
+                # Expand to the unchanged primitive grammar; charge one mutation attempt.
+                candidate = Expr.from_serial(json.loads(json.dumps(macro.expand(args))))
+            except ValueError:
+                continue
+        else:
+            candidate = mutate(parent.candidate, action)
         if candidate.size() > 23 or candidate.depth() > 9 or candidate.key() in seen:
             continue
         current_best = max(pool, key=_quality)
         item = register(candidate, parent, action)
+        if action == "derived_macro":
+            macro_proposals += 1
         if train and policy is not None and mode == "adaptive":
             # Credit only independent training improvements; never sees held-out data.
             policy.update(action, _quality(item) - _quality(current_best))
@@ -143,4 +169,4 @@ def search(task: SealedTask, budget: int, seed: int, mode: str,
     survivors = [p for p in pool if p.survived]
     # Among surviving candidates, prefer smallest full two-part code length.
     selected = min(survivors, key=lambda p: (p.result.mdl_bits, p.candidate.size(), p.candidate.key())) if survivors else max(pool, key=_quality)
-    return SearchResult(selected, len(pool), attempts, len(survivors), label)
+    return SearchResult(selected, len(pool), attempts, len(survivors), label, macro_attempts, macro_proposals)
