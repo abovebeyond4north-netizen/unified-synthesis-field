@@ -29,6 +29,26 @@ class ControlBoundaryTests(unittest.TestCase):
                 self.assertTrue(s._closed)
                 self.assertIsNotNone(task._proc.poll())
 
+    def test_policy_commitment_is_stable_and_rejects_coercion_at_final(self):
+        from usf06.evaluator_supervisor import policy_digest
+        self.assertEqual(policy_digest({"b":2,"a":[1,True,None]}),
+                         policy_digest({"a":[1,True,None],"b":2}))
+        cyclic=[]
+        cyclic.append(cyclic)
+        for val in (cyclic, {"large":"x"*5000}, [[0]*1000]*3,
+                    {str(i):"x"*4096 for i in range(20)}):
+            with self.subTest(kind=type(val).__name__), self.assertRaises(ValueError):
+                policy_digest(val)
+        with PublicSupervisor(("one",)) as s:
+            t=s.open_arm("one")
+            t.training_samples()
+            s.freeze_arm("one",known(),{"counts":[1,2]})
+            with patch.object(s,"_exchange",wraps=s._exchange) as channel:
+                with self.assertRaises(EvaluatorUnavailable):
+                    s.score_all({"one":known()},{"one":{"counts":(1,2)}})
+                channel.assert_not_called()
+            self.assertTrue(s._closed)
+
     def test_malformed_control_frames_fail_closed_in_actual_child(self):
         for variant in ("bad_json","duplicate","oversize","wrong_session",
                         "unknown_op","extra_field","wrong_version","bad_digest"):
