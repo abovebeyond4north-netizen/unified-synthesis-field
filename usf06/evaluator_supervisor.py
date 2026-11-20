@@ -269,7 +269,7 @@ class PublicSupervisor:
                     counters["observations"]==1 and
                     counters["frames"]==1+counters["challenges"] and
                     counters["challenges"]==task.challenge_requests<=self.cap and
-                    0<counters["request_bytes"]<=counters["frames"]*MAX_FRAME,
+                    0<counters["request_bytes"]==task.request_bytes<=counters["frames"]*MAX_FRAME,
                     "learner receipt mismatch")
             self._frozen[arm]=f
             return json.loads(json.dumps(f))
