@@ -61,6 +61,7 @@ class PublicEvaluatorTask:
         self._samples = None
         self._closed = False
         self._challenges = 0
+        self._request_bytes = 0
         self._proc = (_spawn if _spawn_worker is None else _spawn_worker)(self._session, challenge_cap)
         try:
             os.set_blocking(self._proc.stdin.fileno(), False)
@@ -72,6 +73,11 @@ class PublicEvaluatorTask:
     @property
     def challenge_requests(self):
         return self._challenges
+
+    @property
+    def request_bytes(self):
+        """Bytes actually written to the learner pipe, including partial writes."""
+        return self._request_bytes
 
     @property
     def closed(self):
@@ -132,7 +138,11 @@ class PublicEvaluatorTask:
                 if not select.select([], [fd], [], self._remaining(end))[1]:
                     raise TimeoutError
                 try:
-                    sent += os.write(fd, raw[sent:])
+                    written = os.write(fd, raw[sent:])
+                    if written <= 0:
+                        raise OSError("zero-byte pipe write")
+                    sent += written
+                    self._request_bytes += written
                 except BlockingIOError:
                     continue
             received = bytearray()
