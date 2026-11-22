@@ -63,6 +63,46 @@ def receive(sock, deadline):
     return _decode(bytes(raw))
 
 
+def policy_digest(snapshot):
+    """Hash only bounded, strict JSON policy state, without type coercion.
+
+    Dict keys must be strings; tuple/list and integer/string key aliases are
+    not admitted. Bounds limit accidental excessive serialization, not an OS
+    security boundary. Use the same encoding at freeze and final submission.
+    """
+    nodes = 0
+    def validate(value, depth):
+        nonlocal nodes
+        nodes += 1
+        require(nodes <= 2048 and depth <= 16, "policy structure bounds")
+        t = type(value)
+        if value is None or t is bool:
+            return
+        if t is int:
+            require(-(2**63) <= value <= 2**63-1, "policy integer bounds")
+        elif t is float:
+            require(math.isfinite(value), "nonfinite policy number")
+        elif t is str:
+            require(len(value) <= 4096, "policy string bounds")
+        elif t is list:
+            require(len(value) <= 2048, "policy array bounds")
+            for item in value:
+                validate(item, depth+1)
+        elif t is dict:
+            require(len(value) <= 2048, "policy object bounds")
+            for key, item in value.items():
+                require(type(key) is str and len(key) <= 4096, "policy key")
+                validate(item, depth+1)
+        else:
+            raise ValueError("non-JSON policy type")
+    validate(snapshot, 1)
+    raw=json.dumps(snapshot,sort_keys=True,separators=(",",":"),ensure_ascii=True,
+                   allow_nan=False).encode("utf-8")
+    require(len(raw) <= MAX_FRAME, "policy byte bounds")
+    # Deliberately matches core.sha256 on the admitted JSON domain.
+    return sha256(snapshot)
+
+
 def candidate_ast(candidate):
     ast = candidate.serial()
     return parse_candidate(ast).serial()
@@ -206,7 +246,7 @@ class PublicSupervisor:
         try:
             task,_ = self._sessions[arm]
             ast = candidate_ast(candidate)
-            ch,ph = sha256(ast),sha256(policy_snapshot)
+            ch,ph = sha256(ast),policy_digest(policy_snapshot)
             task._seal_transport()
             r = self._exchange(arm, {"op":"FREEZE","candidate_sha256":ch,
                 "policy_sha256":ph,"protocol_sha256":self.protocol_sha256})
@@ -247,7 +287,7 @@ class PublicSupervisor:
             asts={a:candidate_ast(candidates[a]) for a in self.arms}
             for a in self.arms:
                 require(sha256(asts[a])==self._frozen[a]["candidate_sha256"] and
-                        sha256(policies[a])==self._frozen[a]["policy_sha256"],
+                        policy_digest(policies[a])==self._frozen[a]["policy_sha256"],
                         "post-freeze candidate or policy changed")
             barrier={a:self._frozen[a]["freeze_sha256"] for a in self.arms}
             results={}
