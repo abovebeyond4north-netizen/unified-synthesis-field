@@ -65,6 +65,48 @@ jobs:
           assert "sorryAx" not in output
           print("Lean static axiom audit passed:", observed)
           PY
+      - name: Reject a native Lean disallowed axiom report
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import tempfile
+          from usf06.logos import parse_axiom_output
+
+          theorem = "usf_ci_disallowed_axiom"
+          with tempfile.TemporaryDirectory(prefix="usf_axiom_negative_") as tmp:
+              source = Path(tmp) / "negative.lean"
+              source.write_text(
+                  "import Mathlib.Tactic.Ring\n"
+                  "set_option autoImplicit false\n"
+                  f"theorem {theorem} : False := by\n"
+                  "  sorry\n"
+                  f"#print axioms {theorem}\n",
+                  encoding="utf-8",
+              )
+              result = subprocess.run(
+                  ["lake", "env", "lean", str(source)],
+                  capture_output=True,
+                  text=True,
+                  timeout=120,
+                  check=False,
+              )
+          output = result.stdout + "\n" + result.stderr
+          assert result.returncode == 0, (
+              f"Native Lean negative fixture failed to compile: {output[-1200:]}"
+          )
+          axioms = parse_axiom_output(output, theorem)
+          assert axioms is not None, "Expected native #print axioms output"
+          assert any("sorryAx" in ax for ax in axioms), (
+              f"Negative fixture missing expected sorryAx: {axioms}"
+          )
+          allowed = {"propext", "Classical.choice", "Quot.sound"}
+          assert not set(axioms).issubset(allowed), (
+              "Disallowed native axiom was incorrectly accepted"
+          )
+          print("Native disallowed-axiom rejection control passed")
+          PY
       - name: Exercise generated candidate through LogosGate
         run: |
           python - <<'PY'
