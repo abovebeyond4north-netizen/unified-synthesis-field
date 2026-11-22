@@ -44,7 +44,7 @@ class PublicEvaluatorTask:
     """Single-session observation/verdict adapter; do not reuse across arms."""
 
     def __init__(self, *, challenge_cap=1600, request_timeout=2.0,
-                 session_timeout=60.0):
+                 session_timeout=60.0, _spawn_worker=None):
         if os.name != "posix":
             raise NotImplementedError("POSIX pipe transport required")
         if type(challenge_cap) is not int or not 1 <= challenge_cap <= MAX_CHALLENGES:
@@ -61,7 +61,7 @@ class PublicEvaluatorTask:
         self._samples = None
         self._closed = False
         self._challenges = 0
-        self._proc = _spawn(self._session, challenge_cap)
+        self._proc = (_spawn if _spawn_worker is None else _spawn_worker)(self._session, challenge_cap)
         try:
             os.set_blocking(self._proc.stdin.fileno(), False)
             os.set_blocking(self._proc.stdout.fileno(), False)
@@ -95,6 +95,14 @@ class PublicEvaluatorTask:
         except subprocess.TimeoutExpired:
             self._proc.kill()
             self._proc.wait()
+
+    def _seal_transport(self):
+        """Trusted supervisor only: irreversibly close the learner pipes."""
+        if self._closed or self._samples is None or time.monotonic() >= self._expires:
+            self._abort()
+        self._closed = True
+        self._proc.stdin.close()
+        self._proc.stdout.close()
 
     def _abort(self):
         self.close()
